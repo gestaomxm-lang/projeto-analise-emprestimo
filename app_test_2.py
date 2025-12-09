@@ -1505,7 +1505,7 @@ if st.session_state.df_resultado is not None:
     st.divider()
 
     # --- KPIs Premium ---
-    st.markdown("### Indicadores Principais")
+    st.markdown("### Itens com Divergência na Quantidade")
     
     # CSS para valores divergentes em vermelho (ambos os temas) e ajuste de fonte
     st.markdown("""

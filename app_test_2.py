@@ -1221,22 +1221,11 @@ def delete_analysis_from_history(analysis_id):
 
 col_logo, col_title, col_opts = st.columns([1, 4, 1])
 
-# --- Toggle de Tema (Lógica) ---
-query_params = st.query_params
-default_dark = query_params.get("theme", "light") == "dark"
-
 with col_opts:
-    dark_mode = st.toggle("Modo Escuro", value=default_dark, help="Ativar tema escuro")
     if st.button("🔄 Reiniciar", use_container_width=True, type="secondary", help="Limpa a análise e anexo atual"):
         st.session_state.df_resultado = None
         st.session_state.current_metadata = None
         st.rerun()
-
-# Atualiza query param se mudar
-if dark_mode:
-    st.query_params["theme"] = "dark"
-else:
-    st.query_params["theme"] = "light"
 
 with col_logo:
     try:
@@ -1247,134 +1236,7 @@ with col_logo:
 with col_title:
     st.title("Dashboard de Análise")
 
-# Aplica CSS dinâmico baseado no tema
-if dark_mode:
-    st.markdown("""
-        <style>
-        /* Dark Mode Premium */
-        .stApp {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #E8E8E8;
-        }
-        .block-container {
-            background-color: transparent;
-        }
-        /* Header/Toolbar */
-        .stAppHeader {
-            background-color: #0f172a !important;
-            border-bottom: 1px solid #334155;
-        }
-        header[data-testid="stHeader"] {
-            background-color: #0f172a !important;
-        }
-        /* Títulos */
-        h1, h2, h3, h4, h5, h6 {
-            color: #FFFFFF !important;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        }
-        /* Cards KPI */
-        div[data-testid="stMetric"] {
-            background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
-            color: #FFFFFF;
-            border-left: 5px solid #E87722;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
-        div[data-testid="stMetric"] label {
-            color: #A0AEC0 !important;
-            font-weight: 600;
-        }
-        div[data-testid="stMetric"] [data-testid="stMetricValue"] {
-            color: #FFFFFF !important;
-        }
-        div[data-testid="stMetric"] [data-testid="stMetricDelta"] {
-            color: #48BB78 !important;
-        }
-        
-        /* Textos gerais */
-        .stMarkdown p, .stMarkdown span, .stMarkdown div, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-            color: #E8E8E8 !important;
-        }
-        
-        /* Correção para Tooltips e Toasts */
-        div[data-baseweb="tooltip"], div[data-baseweb="toast"], .stToast {
-            color: #333333 !important;
-        }
-        div[data-baseweb="tooltip"] div, div[data-baseweb="toast"] div {
-            color: #333333 !important;
-        }
-        
-        /* Links */
-        a, .stMarkdown a {
-            color: #FFFFFF !important;
-        }
-        a:hover, .stMarkdown a:hover {
-            color: #E87722 !important;
-        }
-        
-        /* Info boxes */
-        .stAlert {
-            background-color: #2d3748;
-            color: #E8E8E8;
-            border-left-color: #4299E1;
-        }
-        
-        /* Tabelas */
-        .dataframe {
-            background-color: #2d3748 !important;
-            color: #E8E8E8 !important;
-        }
-        .dataframe th {
-            background-color: #1a202c !important;
-            color: #FFFFFF !important;
-        }
-        .dataframe td {
-            color: #E8E8E8 !important;
-        }
-        
-        /* Inputs */
-        .stTextInput input, .stSelectbox select, .stMultiSelect {
-            background-color: #2d3748 !important;
-            color: #FFFFFF !important;
-            border-color: #4a5568 !important;
-        }
-        
-        /* Slider */
-        .stSlider {
-            color: #E8E8E8;
-        }
-        
-        /* Divider */
-        hr {
-            border-color: #4a5568 !important;
-        }
-        
-        /* Expander */
-        .streamlit-expanderHeader {
-            background-color: #2d3748 !important;
-            color: #FFFFFF !important;
-        }
-        
-        /* Botões */
-        .stButton button {
-            background-color: #E87722 !important;
-            color: white !important;
-            border: 1px solid #E87722 !important;
-        }
-        .stButton button:hover {
-            background-color: #d16615 !important;
-            border: 1px solid #d16615 !important;
-        }
-        .stButton button[kind="secondary"] {
-            background-color: #4a5568 !important;
-            color: #FFFFFF !important;
-            border: 1px solid #718096 !important;
-        }
-        .stButton button[kind="secondary"]:hover {
-            background-color: #2d3748 !important;
-            border: 1px solid #4a5568 !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
+
 
 # --- CONFIGURAÇÃO E UPLOADS (EXPANDER) ---
 # Expandido se NÃO tiver resultado ainda
@@ -1411,104 +1273,7 @@ with st.expander("📁 Upload e Configurações da Análise", expanded=expander_
                 st.caption("Mínimo 2 arquivos.")
             processar = False
 
-# --- HISTÓRICO E CONSOLIDAÇÃO ---
-# Layout em duas colunas para economizar espaço vertical
-col_hist, col_consol = st.columns(2)
 
-with col_hist:
-    with st.expander("📜 Histórico de Análises Salvas", expanded=False):
-        history_list = load_history_list()
-        
-        if history_list:
-            st.caption(f"{len(history_list)} análises disponíveis.")
-            for idx, metadata in enumerate(history_list):
-                # Container simples para cada item
-                c1, c2, c3 = st.columns([3, 1, 1])
-                with c1:
-                    st.markdown(f"**{metadata['data_formatada']}**\n\nItens: {metadata['total_itens']}")
-                with c2:
-                    if st.button("Abrir", key=f"load_{metadata['id']}", use_container_width=True):
-                        df_loaded, meta_loaded = load_analysis_from_history(metadata['id'])
-                        if df_loaded is not None:
-                            st.session_state.df_resultado = df_loaded
-                            st.session_state.current_metadata = meta_loaded
-                            st.rerun()
-                with c3:
-                     if st.button("🗑️", key=f"del_{metadata['id']}", use_container_width=True, help="Excluir"):
-                        if delete_analysis_from_history(metadata['id']):
-                            st.toast("Análise excluída!")
-                            st.rerun()
-                st.divider()
-        else:
-            st.info("Nenhuma análise salva.")
-
-with col_consol:
-    with st.expander("📊 Consolidação de Análises", expanded=False):
-        if history_list and len(history_list) >= 2:
-            analises_disponiveis = {}
-            for idx, meta in enumerate(history_list):
-                label = f"{meta['data_formatada']} ({meta['total_itens']} itens)"
-                analises_disponiveis[label] = meta['id']
-            
-            analises_selecionadas = st.multiselect(
-                "Selecione para consolidar:",
-                options=list(analises_disponiveis.keys()),
-                default=[],
-                key="multiselect_consolidacao"
-            )
-            
-            if len(analises_selecionadas) >= 2:
-                if st.button("Mesclar e Reanalisar", type="primary", use_container_width=True):
-                     with st.spinner("Consolidando..."):
-                        dfs_saida = []
-                        dfs_entrada = []
-                        
-                        for nome_analise in analises_selecionadas:
-                            analise_id = analises_disponiveis[nome_analise]
-                            df_loaded, meta = load_analysis_from_history(analise_id)
-                            
-                            if df_loaded is not None:
-                                # Reconstrói estruturas baseadas no dataframe carregado
-                                # (Lógica simplificada para reconstrução)
-                                df_saida_temp = df_loaded[df_loaded['Produto (Saída)'] != '-'][
-                                    ['Data', 'Unidade Origem', 'Unidade Destino', 'Documento', 
-                                     'Produto (Saída)', 'Espécie', 'Valor Saída (R$)', 'Qtd Saída']
-                                ].copy()
-                                df_saida_temp.columns = ['data', 'unidade_origem', 'unidade_destino', 'doc_num', 
-                                                         'ds_produto', 'especie', 'valor_total', 'qt_entrada']
-                                
-                                df_entrada_temp = df_loaded[df_loaded['Produto (Entrada)'] != '-'][
-                                    ['Data', 'Unidade Origem', 'Unidade Destino', 'Documento', 
-                                     'Produto (Entrada)', 'Espécie', 'Valor Entrada (R$)', 'Qtd Entrada']
-                                ].copy()
-                                df_entrada_temp.columns = ['data', 'unidade_origem', 'unidade_destino', 'doc_num', 
-                                                           'ds_produto', 'especie', 'valor_total', 'qt_entrada']
-                                
-                                dfs_saida.append(df_saida_temp)
-                                dfs_entrada.append(df_entrada_temp)
-                        
-                        if dfs_saida and dfs_entrada:
-                            df_saida_consolidado = pd.concat(dfs_saida, ignore_index=True).drop_duplicates()
-                            df_entrada_consolidado = pd.concat(dfs_entrada, ignore_index=True).drop_duplicates()
-                            
-                            progress_bar = st.progress(0, text="Processando consolidação...")
-                            df_resultado_consolidado, stats = analisar_itens(
-                                df_saida_consolidado, 
-                                df_entrada_consolidado, 
-                                limiar_similaridade=65, 
-                                progress_bar=progress_bar
-                            )
-                            progress_bar.empty()
-                            
-                            st.session_state.df_resultado = df_resultado_consolidado
-                            st.session_state.current_metadata = {
-                                'arquivo_saida': 'Consolidado',
-                                'arquivo_entrada': 'Consolidado',
-                                'data_formatada': f"Consolidado ({len(analises_selecionadas)} análises)"
-                            }
-                            st.rerun()
-        else:
-            st.caption("Necessário ter pelo menos 2 análises salvas.")
 
 # --- Lógica de Processamento ---
 if 'df_resultado' not in st.session_state:

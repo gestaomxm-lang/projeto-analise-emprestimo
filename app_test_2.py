@@ -1391,7 +1391,7 @@ with st.expander("📁 Upload e Configurações da Análise", expanded=expander_
         )
     
     with col_param:
-        limiar = st.slider("Sensibilidade do Match (%)", 0, 100, 65)
+        limiar = 65 # Valor padrão fixo
         
         if uploaded_files and len(uploaded_files) >= 2:
             processar = st.button("🚀 Processar Análise", type="primary", use_container_width=True)

@@ -1379,6 +1379,15 @@ if dark_mode:
 # --- CONFIGURAÇÃO E UPLOADS (EXPANDER) ---
 # Expandido se NÃO tiver resultado ainda
 expander_open = st.session_state.df_resultado is None
+
+if expander_open:
+    st.info("Faça o upload dos arquivos abaixo para começar.")
+    st.markdown("""
+    ### Instruções:
+    1.  Arraste os arquivos de **Saída** e **Entrada** para a área de upload.
+    2.  O sistema identificará automaticamente qual é qual.
+    3.  Ajuste os filtros se necessário e explore os resultados!
+    """)
 with st.expander("📁 Upload e Configurações da Análise", expanded=expander_open):
     col_up, col_param = st.columns([2, 1])
     
@@ -2067,11 +2076,3 @@ if st.session_state.df_resultado is not None:
         type="primary"
     )
 
-else:
-    st.info("Faça o upload dos arquivos na barra lateral para começar.")
-    st.markdown("""
-    ### Instruções:
-    1.  Arraste os arquivos de **Saída** e **Entrada** para a área de upload.
-    2.  O sistema identificará automaticamente qual é qual.
-    3.  Ajuste os filtros se necessário e explore os resultados!
-    """)

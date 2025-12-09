@@ -1239,7 +1239,7 @@ with col_logo:
         st.warning("Logo?")
 
 with col_title:
-    st.title("Dashboard de Análise")
+    st.title("Análise de Tranferências - Via Empréstimo")
 
 
 

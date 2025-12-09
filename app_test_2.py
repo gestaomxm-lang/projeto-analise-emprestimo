@@ -1219,12 +1219,17 @@ def delete_analysis_from_history(analysis_id):
 
 # --- Interface Streamlit ---
 
+# Inicializa chave do uploader se não existir
+if 'uploader_key' not in st.session_state:
+    st.session_state.uploader_key = 0
+
 col_logo, col_title, col_opts = st.columns([1, 4, 1])
 
 with col_opts:
-    if st.button("🔄 Reiniciar", use_container_width=True, type="secondary", help="Limpa a análise e anexo atual"):
+    if st.button("🔄 Nova Análise", use_container_width=True, type="secondary", help="Limpa a análise e anexo atual"):
         st.session_state.df_resultado = None
         st.session_state.current_metadata = None
+        st.session_state.uploader_key += 1 # Força recriação do uploader
         st.rerun()
 
 with col_logo:
@@ -1257,7 +1262,8 @@ with st.expander("📁 Upload e Configurações da Análise", expanded=expander_
             "Anexar Arquivos (XLSX/XLS)", 
             type=["xlsx", "xls"], 
             accept_multiple_files=True,
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            key=f"uploader_{st.session_state.uploader_key}" # Chave dinâmica para reset
         )
     
     with col_param:

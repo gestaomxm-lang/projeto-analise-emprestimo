@@ -193,9 +193,77 @@ def normalizar_valor_numerico(valor):
     except (ValueError, TypeError):
         return 0.0
 
+def normalizar_unidade_medida(texto):
+    """Normaliza unidades de medida para formato padrão."""
+    mapeamento = {
+        'GR': 'G',
+        'GRAMA': 'G',
+        'GRAMAS': 'G',
+        'MILIGRAMA': 'MG',
+        'MILIGRAMAS': 'MG',
+        'MILILITRO': 'ML',
+        'MILILITROS': 'ML',
+        'MICROGRAMA': 'MCG',
+        'MICROGRAMAS': 'MCG',
+        'UNIDADE': 'UI',
+        'UNIDADES': 'UI',
+        'LITRO': 'L',
+        'LITROS': 'L',
+        'METRO': 'M',
+        'METROS': 'M',
+        'CENTIMETRO': 'CM',
+        'CENTIMETROS': 'CM',
+        'MILIMETRO': 'MM',
+        'MILIMETROS': 'MM'
+    }
+    
+    texto_norm = texto.upper()
+    for variacao, padrao in mapeamento.items():
+        texto_norm = re.sub(r'\b' + variacao + r'\b', padrao, texto_norm)
+    
+    return texto_norm
+
+def normalizar_dimensao(dimensao_str):
+    """Normaliza dimensões para comparação consistente."""
+    # Remove espaços
+    dimensao_str = re.sub(r'\s+', '', dimensao_str.upper())
+    
+    # Extrai números
+    numeros = re.findall(r'\d+\.?\d*', dimensao_str)
+    
+    # Normaliza removendo zeros desnecessários e ordena
+    numeros_norm = [str(float(n)) for n in numeros if n]
+    
+    # Ordena para comparar 25X7 com 7X25
+    return 'X'.join(sorted(numeros_norm))
+
+def extrair_e_normalizar_concentracao(descricao):
+    """Extrai concentração e normaliza para formato comparável."""
+    descricao = normalizar_unidade_medida(descricao)
+    
+    # Padrões expandidos para capturar diferentes formatos
+    padroes = [
+        r'(\d+[,.]?\d*)\s*(MG|G|ML|MCG|UI|L|%)\s*/\s*(\d+[,.]?\d*)\s*(MG|G|ML|MCG|UI|L)',  # 50MG/5ML
+        r'(\d+[,.]?\d*)\s*(MG|G|ML|MCG|UI|L|%)(?!\s*/)',  # 50MG
+    ]
+    
+    concentracoes = []
+    for padrao in padroes:
+        matches = re.findall(padrao, descricao)
+        for match in matches:
+            if isinstance(match, tuple):
+                # Junta os elementos da tupla
+                conc_str = ''.join(str(c) for c in match).replace(',', '.')
+                concentracoes.append(conc_str)
+    
+    return ' '.join(concentracoes) if concentracoes else ''
+
 def extrair_componentes_produto(descricao):
     """Extrai componentes principais do produto para matching inteligente."""
     descricao = str(descricao).upper().strip()
+    
+    # Aplica normalização de unidades primeiro
+    descricao = normalizar_unidade_medida(descricao)
     
     componentes = {
         'original': descricao,
@@ -205,6 +273,7 @@ def extrair_componentes_produto(descricao):
         'apresentacao': '',
         'quantidade': '',
         'unidade_medida': '',
+        'dimensao': '',
         'palavras_chave': []
     }
     
@@ -213,10 +282,8 @@ def extrair_componentes_produto(descricao):
     texto_limpo = re.sub(r'\s+', ' ', texto_limpo).strip()
     componentes['normalizado'] = texto_limpo
     
-    # Extrai concentração
-    concentracoes = re.findall(r'\d+[,.]?\d*\s*(?:MG|G|ML|MCG|UI|%|MG/ML|G/ML)', descricao)
-    if concentracoes:
-        componentes['concentracao'] = ' '.join(concentracoes)
+    # Extrai concentração usando função melhorada
+    componentes['concentracao'] = extrair_e_normalizar_concentracao(descricao)
     
     # Extrai apresentação
     apresentacoes = [
@@ -235,10 +302,10 @@ def extrair_componentes_produto(descricao):
     if qtd_match:
         componentes['quantidade'] = qtd_match.group(1)
         
-    # Extrai dimensões (ex: 13X4,5, 25X7, 40X12)
-    dimensoes = re.search(r'\d+\s*[xX]\s*\d+(?:[.,]\d+)?', descricao)
+    # Extrai dimensões (ex: 13X4,5, 25X7, 40X12, 0.70X25MM)
+    dimensoes = re.search(r'\d+\.?\d*\s*[xX]\s*\d+\.?\d*', descricao)
     if dimensoes:
-        componentes['dimensao'] = dimensoes.group()
+        componentes['dimensao'] = normalizar_dimensao(dimensoes.group())
     
     # Extrai palavras-chave (remove stopwords médicas comuns)
     stopwords = [
@@ -262,12 +329,53 @@ def calcular_similaridade_precalc(comp1, comp2, ignore_penalties=False):
     
     # 0. Verificação de Sinônimos (Bônus imediato)
     sinonimos = {
-        'AVENTAL': ['CAPOTE', 'AVENTAL'],
-        'CAPOTE': ['AVENTAL', 'CAPOTE'],
-        'ALGODAO': ['POLYCOT', 'ALGODAO'],
-        'POLYCOT': ['ALGODAO', 'POLYCOT'],
-        'SORO': ['SOLUCAO', 'SORO'],
-        'SOLUCAO': ['SORO', 'SOLUCAO']
+        # Equipamentos
+        'AVENTAL': ['CAPOTE', 'AVENTAL', 'JALECO'],
+        'CAPOTE': ['AVENTAL', 'CAPOTE', 'JALECO'],
+        'JALECO': ['AVENTAL', 'CAPOTE', 'JALECO'],
+        
+        # Materiais
+        'ALGODAO': ['POLYCOT', 'ALGODAO', 'COTTON'],
+        'POLYCOT': ['ALGODAO', 'POLYCOT', 'COTTON'],
+        'COTTON': ['ALGODAO', 'POLYCOT', 'COTTON'],
+        'GAZE': ['COMPRESSA', 'GAZE'],
+        'COMPRESSA': ['GAZE', 'COMPRESSA'],
+        
+        # Soluções
+        'SORO': ['SOLUCAO', 'SORO', 'SOL'],
+        'SOLUCAO': ['SORO', 'SOLUCAO', 'SOL'],
+        'SOL': ['SORO', 'SOLUCAO', 'SOL'],
+        'SALINA': ['NACL', 'CLORETO', 'SALINA', 'SF'],
+        'NACL': ['SALINA', 'CLORETO', 'NACL', 'SF'],
+        'SF': ['SALINA', 'NACL', 'CLORETO', 'SF'],
+        
+        # Formas farmacêuticas
+        'AMPOLA': ['AMP', 'AMPOLA', 'FRAMP', 'FRASCOAMPOLA'],
+        'AMP': ['AMPOLA', 'AMP', 'FRAMP', 'FRASCOAMPOLA'],
+        'FRAMP': ['AMP', 'AMPOLA', 'FRAMP', 'FRASCOAMPOLA'],
+        'FRASCOAMPOLA': ['AMP', 'AMPOLA', 'FRAMP', 'FRASCOAMPOLA'],
+        'COMPRIMIDO': ['COMP', 'CP', 'COMPRIMIDO', 'DRAGEA'],
+        'COMP': ['COMPRIMIDO', 'COMP', 'CP', 'DRAGEA'],
+        'CP': ['COMPRIMIDO', 'COMP', 'CP', 'DRAGEA'],
+        'CAPSULA': ['CAPS', 'CAPSULA', 'CAP'],
+        'CAPS': ['CAPSULA', 'CAPS', 'CAP'],
+        'CAP': ['CAPSULA', 'CAPS', 'CAP'],
+        
+        # Vias de administração
+        'INJETAVEL': ['INJ', 'INJETAVEL', 'IV', 'IM', 'SC'],
+        'INJ': ['INJETAVEL', 'INJ', 'IV', 'IM', 'SC'],
+        'ORAL': ['VO', 'ORAL', 'BUCAL'],
+        'VO': ['ORAL', 'VO', 'BUCAL'],
+        
+        # Princípios ativos comuns
+        'DIPIRONA': ['METAMIZOL', 'DIPIRONA', 'NOVALGINA'],
+        'METAMIZOL': ['DIPIRONA', 'METAMIZOL', 'NOVALGINA'],
+        'PARACETAMOL': ['ACETAMINOFENO', 'PARACETAMOL'],
+        'ACETAMINOFENO': ['PARACETAMOL', 'ACETAMINOFENO'],
+        'OMEPRAZOL': ['OMEPRAZOL', 'LOSEC'],
+        'DICLOFENACO': ['DICLOFENACO', 'VOLTAREN', 'CATAFLAM'],
+        'GLICOSE': ['DEXTROSE', 'GLICOSE'],
+        'DEXTROSE': ['GLICOSE', 'DEXTROSE'],
     }
     
     tem_sinonimo = False
@@ -293,52 +401,61 @@ def calcular_similaridade_precalc(comp1, comp2, ignore_penalties=False):
     
     # 3. Concentração (20%)
     if comp1['concentracao'] and comp2['concentracao']:
-        c1 = comp1['concentracao'].replace(' ', '')
-        c2 = comp2['concentracao'].replace(' ', '')
+        c1 = comp1['concentracao'].replace(' ', '').upper()
+        c2 = comp2['concentracao'].replace(' ', '').upper()
         
-        # Tenta normalizar 50MG/5ML -> 10MG/ML (simplificado)
-        # Se uma contiver a outra, ou se forem iguais
+        # Comparação exata
         if c1 == c2:
             score += 20
             detalhes.append(f"Conc:✓")
-        elif c1 in c2 or c2 in c1:
-             # Ex: 50MG está em 50MG/5ML (não é perfeito, mas ajuda)
-            score += 15
-            detalhes.append(f"Conc:part")
         else:
-            sim_conc = SequenceMatcher(None, comp1['concentracao'], comp2['concentracao']).ratio()
-            if sim_conc > 0.8:
-                score += sim_conc * 20
-                detalhes.append(f"Conc:~{sim_conc:.0%}")
-            elif not ignore_penalties:
-                # Penaliza se as concentrações forem claramente diferentes (ex: 60 ML vs 20 ML)
-                # SÓ PENALIZA SE NÃO TIVER DOCUMENTO CORRESPONDENTE
-                score -= 25
-                detalhes.append(f"Conc:Mismatch")
+            # Extrai números para comparação numérica
+            nums1 = re.findall(r'\d+\.?\d*', c1)
+            nums2 = re.findall(r'\d+\.?\d*', c2)
+            
+            # Se tem números em comum, pode ser variação do mesmo produto
+            nums_comum = set(nums1) & set(nums2)
+            
+            if nums_comum and len(nums_comum) >= len(nums1) * 0.5:
+                # Pelo menos 50% dos números batem
+                score += 15
+                detalhes.append(f"Conc:~")
+            else:
+                # Tenta similaridade textual como fallback
+                sim_conc = SequenceMatcher(None, c1, c2).ratio()
+                if sim_conc > 0.7:
+                    score += sim_conc * 15
+                    detalhes.append(f"Conc:~{sim_conc:.0%}")
+                elif not ignore_penalties:
+                    # Penaliza concentrações claramente diferentes
+                    score -= 25
+                    detalhes.append(f"Conc:Mismatch")
     
     # 4. Dimensão (bônus ou penalidade) - Importante para agulhas
-    if 'dimensao' in comp1 and 'dimensao' in comp2:
-        # Normaliza dimensões para comparação (remove zeros a esquerda, espaços, etc)
-        # Ex: 25X7 vs 0.70X25
-        d1 = re.sub(r'[^\d]', '', comp1['dimensao'])
-        d2 = re.sub(r'[^\d]', '', comp2['dimensao'])
+    if 'dimensao' in comp1 and 'dimensao' in comp2 and comp1['dimensao'] and comp2['dimensao']:
+        # Usa dimensões já normalizadas (ordenadas e sem zeros extras)
+        d1_norm = comp1['dimensao']
+        d2_norm = comp2['dimensao']
         
-        # Verifica se os números de uma estão na outra
-        nums1 = re.findall(r'\d+', comp1['dimensao'])
-        nums2 = re.findall(r'\d+', comp2['dimensao'])
-        
-        comum = set(nums1) & set(nums2)
-        
-        if comp1['dimensao'] == comp2['dimensao']:
+        if d1_norm == d2_norm:
             score += 15
             detalhes.append(f"Dim:✓")
-        elif len(comum) >= 2: # Pelo menos 2 números batem (ex: 25 e 7)
-            score += 10
-            detalhes.append(f"Dim:~")
-        elif not ignore_penalties:
-            # Dimensões diferentes são críticas para agulhas
-            score -= 15
-            detalhes.append(f"Dim:Mismatch")
+        else:
+            # Verifica se os números individuais batem
+            nums1 = set(d1_norm.split('X'))
+            nums2 = set(d2_norm.split('X'))
+            comum = nums1 & nums2
+            
+            if len(comum) >= 2:  # Pelo menos 2 números batem
+                score += 10
+                detalhes.append(f"Dim:~")
+            elif len(comum) >= 1:  # Pelo menos 1 número bate
+                score += 5
+                detalhes.append(f"Dim:part")
+            elif not ignore_penalties:
+                # Dimensões completamente diferentes são críticas
+                score -= 15
+                detalhes.append(f"Dim:Mismatch")
     
     # 5. Apresentação (10%)
     if comp1['apresentacao'] and comp2['apresentacao']:
@@ -375,6 +492,37 @@ def calcular_similaridade_precalc(comp1, comp2, ignore_penalties=False):
         detalhes.append(f"Palavras:{len(palavras_comum)}")
     
     return score, ' | '.join(detalhes)
+
+def validar_match_quantidade(qtd_saida, qtd_entrada, score_produto, doc_match):
+    """Valida se o match de quantidade faz sentido para evitar falsos positivos.
+    
+    Retorna: (is_valid, diferenca_qtd)
+    """
+    # Se as quantidades são exatamente iguais (com tolerância float), sempre válido
+    if abs(qtd_saida - qtd_entrada) < 0.01:
+        return True, 0.0
+    
+    # Calcula diferença percentual
+    qtd_max = max(qtd_saida, qtd_entrada)
+    if qtd_max == 0:
+        return True, 0.0
+    
+    perc_diff = abs(qtd_saida - qtd_entrada) / qtd_max * 100
+    
+    # Se tem documento correspondente e produto muito similar, aceita variação maior
+    if doc_match and score_produto >= 85:
+        # Tolera até 20% de diferença se doc e produto batem bem
+        if perc_diff <= 20:
+            return True, qtd_saida - qtd_entrada
+    
+    # Se não tem documento, exige quantidade mais próxima
+    if not doc_match:
+        # Só aceita se diferença for pequena (<10%)
+        if perc_diff > 10:
+            return False, None
+    
+    # Caso padrão: aceita o match
+    return True, qtd_saida - qtd_entrada
 
 def eh_casa_portugal(unidade):
     unidade_norm = str(unidade).upper().strip()
@@ -452,16 +600,20 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
                         if idx_e in entradas_processadas: continue
                         
                         row_e = df_entrada.loc[idx_e]
+                        qtd_e = float(row_e.get('qt_entrada', 0))
+                        
+                        # CRITICAL: Valida qualidade do match baseado na quantidade
+                        # Se quantidade bate com a SOMA, aceita threshold menor (70%)
+                        # Se quantidade difere, exige threshold maior (85%)
+                        qtd_match_soma = abs(qtd_e - qtd_total_saida) < 0.1
+                        limiar_grupo = 70 if qtd_match_soma else 85
                         
                         # Verifica produto (ignora penalidades pois tem documento)
                         score_prod, _ = calcular_similaridade_precalc(comp_grupo, row_e['comps'], ignore_penalties=True)
                         
-                        if score_prod >= 70:
-                            qtd_e = float(row_e.get('qt_entrada', 0))
-                            
+                        if score_prod >= limiar_grupo:
                             # Verifica se a quantidade da entrada bate com a SOMA das saídas
-                            # Tolerância pequena (0.1)
-                            if abs(qtd_e - qtd_total_saida) < 0.1:
+                            if qtd_match_soma:
                                 # MATCH ENCONTRADO! (Agrupamento de Saída)
                                 
                                 # Marca entrada como usada
@@ -546,6 +698,8 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
         # ESTRATÉGIA DE BUSCA INTELIGENTE - DOCUMENTO PRIMEIRO
         candidatos_idx = []
         match_agregado = None
+        candidatos = pd.DataFrame()  # Inicializa vazio por padrão
+        documento_nao_encontrado = False  # Flag para prevenir fallback
         
         # PRIORIDADE 1: Verificação obrigatória do documento (exceto Casa Portugal)
         # O documento DEVE ser verificado ANTES de qualquer cruzamento por item
@@ -562,12 +716,20 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
                 
                 for idx_e in candidatos_disponiveis:
                     row_e = df_entrada.loc[idx_e]
+                    qtd_e = float(row_e.get('qt_entrada', 0))
+                    
+                    # CRITICAL: Valida qualidade do match baseado na quantidade
+                    # Se quantidade bate exata, aceita threshold menor (70%)
+                    # Se quantidade difere, exige threshold maior (85%) para evitar matches incorretos
+                    qtd_match_exato = abs(qtd_e - qtd_s) < 0.01  # Tolerância float
+                    limiar_doc = 70 if qtd_match_exato else 85
+                    
                     # Como estamos dentro do bloco de mesmo documento, podemos ignorar penalidades
                     score_prod, _ = calcular_similaridade_precalc(comp_s, row_e['comps'], ignore_penalties=True)
-                    if score_prod >= 70:  # Reduzido de 85 para 70 pois já temos o documento
-                        qtd_e = float(row_e.get('qt_entrada', 0))
+                    
+                    if score_prod >= limiar_doc:
                         # PRIORIDADE: Se encontrou quantidade EXATA, guarda para usar individualmente
-                        if abs(qtd_e - qtd_s) < 0.01:  # Quantidade exata (tolerância float)
+                        if qtd_match_exato:
                             match_exato = {
                                 'index': idx_e,
                                 'row': row_e,
@@ -620,6 +782,7 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
                 # Documento não encontrado na entrada - marca como não encontrado
                 # Não busca por outros critérios se o documento não existe
                 candidatos = pd.DataFrame()  # DataFrame vazio
+                documento_nao_encontrado = True  # CRITICAL: Previne fallback
         elif destino_eh_cp:
             # Casa Portugal: não exige documento, busca por data e produto
             if pd.notna(data_s):
@@ -630,12 +793,15 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
                 candidatos = df_entrada
         else:
             # Sem documento válido: busca por janela de data (fallback)
-            if pd.notna(data_s):
-                mask_data = (df_entrada['data'] >= data_s - pd.Timedelta(days=30)) & \
-                            (df_entrada['data'] <= data_s + pd.Timedelta(days=30))
-                candidatos = df_entrada[mask_data]
-            else:
-                candidatos = df_entrada
+            # IMPORTANTE: Só faz fallback se o documento não existia (não foi "não encontrado")
+            if not documento_nao_encontrado:
+                if pd.notna(data_s):
+                    mask_data = (df_entrada['data'] >= data_s - pd.Timedelta(days=30)) & \
+                                (df_entrada['data'] <= data_s + pd.Timedelta(days=30))
+                    candidatos = df_entrada[mask_data]
+                else:
+                    candidatos = df_entrada
+            # Se documento_nao_encontrado=True, candidatos já está vazio (linha 696)
         
         # Se ainda tem muitos candidatos, limita aos 100 mais recentes
         if len(candidatos) > 100:
@@ -694,8 +860,14 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
                 # Se tem documento correspondente, ignora penalidades de divergência leve
                 score_produto, detalhes_produto = calcular_similaridade_precalc(comp_s, row_e['comps'], ignore_penalties=doc_match)
                 
-                # Se tem documento correspondente, aceita similaridade menor (ex: 40%)
-                limiar_efetivo = 40 if doc_match else limiar_similaridade
+                # Se tem documento correspondente, valida a quantidade para definir o limiar
+                if doc_match:
+                    qtd_e = float(row_e.get('qt_entrada', 0))
+                    qtd_match_exato = abs(qtd_e - qtd_s) < 0.01
+                    # Se quantidade bate, aceita limiar baixo (40%). Se não bate, exige alto (85%)
+                    limiar_efetivo = 40 if qtd_match_exato else 85
+                else:
+                    limiar_efetivo = limiar_similaridade
                 
                 if score_produto < limiar_efetivo: 
                     continue  # Produto não similar o suficiente
@@ -780,6 +952,32 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
             best_match = matches[0]
             row_e = best_match['row']
             
+            # VALIDAÇÃO DE QUANTIDADE - Evita falsos positivos
+            valor_e = float(row_e['valor_total'])
+            qtd_e = float(row_e.get('qt_entrada', 0))
+            
+            # Verifica se o match de quantidade faz sentido
+            doc_match = (doc_num and doc_num != '' and doc_num == row_e.get('doc_num', ''))
+            is_valid, diferenca_qtd_validada = validar_match_quantidade(
+                qtd_s, qtd_e, best_match['score_produto'], doc_match
+            )
+            
+            # Se a validação falhou, trata como não encontrado
+            if not is_valid:
+                stats['nao_encontrados'] += 1
+                stats['nao_conformes'] += 1
+                analise.append([
+                    data_s, row_s['unidade_origem'], row_s['unidade_destino'], doc_num, produto_s, "-",
+                    row_s.get('especie', ''), valor_s, None, None, 
+                    qtd_s, None, None,
+                    "❌ Não Conforme", "Item não encontrado (quantidade incompatível)", "-", 
+                    f"Match rejeitado: Qtd muito divergente (Saída:{qtd_s} vs Entrada:{qtd_e})", "-"
+                ])
+                continue  # Pula para próximo item
+            
+            # Match válido - prossegue com análise normal
+            diferenca_qtd = diferenca_qtd_validada
+            
             # Marca processados (pode ser lista de índices ou único)
             if 'indices' in best_match:
                 for idx in best_match['indices']:
@@ -787,11 +985,7 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
             else:
                 entradas_processadas.add(best_match['index'])
             
-            valor_e = float(row_e['valor_total'])
-            qtd_e = float(row_e.get('qt_entrada', 0))
-            
             diferenca_valor = round(valor_s - valor_e, 2)
-            diferenca_qtd = qtd_s - qtd_e
             
             perc_diff_valor = abs(diferenca_valor / valor_s * 100) if valor_s > 0 else 0
             
@@ -1025,335 +1219,287 @@ def delete_analysis_from_history(analysis_id):
 
 # --- Interface Streamlit ---
 
-col_logo, col_title = st.columns([2, 4])
+col_logo, col_title, col_opts = st.columns([1, 4, 1])
+
+# --- Toggle de Tema (Lógica) ---
+query_params = st.query_params
+default_dark = query_params.get("theme", "light") == "dark"
+
+with col_opts:
+    dark_mode = st.toggle("Modo Escuro", value=default_dark, help="Ativar tema escuro")
+    if st.button("🔄 Reiniciar", use_container_width=True, type="secondary", help="Limpa a análise e anexo atual"):
+        st.session_state.df_resultado = None
+        st.session_state.current_metadata = None
+        st.rerun()
+
+# Atualiza query param se mudar
+if dark_mode:
+    st.query_params["theme"] = "dark"
+else:
+    st.query_params["theme"] = "light"
+
 with col_logo:
     try:
         st.image("logo.png", use_container_width=True)
     except:
-        st.warning("Logo não encontrada")
+        st.warning("Logo?")
 
 with col_title:
     st.title("Dashboard de Análise")
 
-# --- Sidebar: Configuração e Filtros ---
-with st.sidebar:
-    # --- Toggle de Tema ---
-    st.markdown("### Aparência")
-    
-    # Verifica query params para persistência
-    query_params = st.query_params
-    default_dark = query_params.get("theme", "light") == "dark"
-    
-    dark_mode = st.toggle("Modo Escuro", value=default_dark, help="Ativar tema escuro")
-    
-    # Atualiza query param se mudar
-    if dark_mode:
-        st.query_params["theme"] = "dark"
-    else:
-        st.query_params["theme"] = "light"
-
-    # Botão de Nova Análise
-    if st.button("🔄 Nova Análise", use_container_width=True, type="secondary"):
-        st.session_state.df_resultado = None
-        st.session_state.current_metadata = None
-        st.rerun()
-    
-    # Aplica CSS dinâmico baseado no tema
-    if dark_mode:
-        st.markdown("""
-            <style>
-            /* Dark Mode Premium */
-            .stApp {
-                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-                color: #E8E8E8;
-            }
-            .block-container {
-                background-color: transparent;
-            }
-            /* Header/Toolbar */
-            .stAppHeader {
-                background-color: #0f172a !important;
-                border-bottom: 1px solid #334155;
-            }
-            header[data-testid="stHeader"] {
-                background-color: #0f172a !important;
-            }
-            /* Títulos */
-            h1, h2, h3, h4, h5, h6 {
-                color: #FFFFFF !important;
-                text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            }
-            /* Cards KPI */
-            div[data-testid="stMetric"] {
-                background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
-                color: #FFFFFF;
-                border-left: 5px solid #E87722;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            }
-            div[data-testid="stMetric"] label {
-                color: #A0AEC0 !important;
-                font-weight: 600;
-            }
-            div[data-testid="stMetric"] [data-testid="stMetricValue"] {
-                color: #FFFFFF !important;
-            }
-            div[data-testid="stMetric"] [data-testid="stMetricDelta"] {
-                color: #48BB78 !important;
-            }
-            /* Sidebar */
-            [data-testid="stSidebar"] {
-                background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-            }
-            [data-testid="stSidebar"] .stMarkdown {
-                color: #E8E8E8;
-            }
-            /* Labels dos widgets da sidebar */
-            [data-testid="stSidebar"] label {
-                color: #FFFFFF !important;
-            }
-            [data-testid="stSidebar"] .stMarkdown p, 
-            [data-testid="stSidebar"] .stMarkdown span,
-            [data-testid="stSidebar"] p,
-            [data-testid="stSidebar"] span {
-                color: #E8E8E8 !important;
-            }
-            /* Texto dos expanders na sidebar */
-            [data-testid="stSidebar"] .streamlit-expanderHeader {
-                color: #FFFFFF !important;
-            }
-            /* Ícones e botões da sidebar */
-            [data-testid="stSidebar"] button {
-                color: #FFFFFF !important;
-            }
-            [data-testid="stSidebar"] svg {
-                fill: #FFFFFF !important;
-                color: #FFFFFF !important;
-            }
-            /* Textos gerais */
-            /* Textos gerais - MENOS agressivo para não quebrar tooltips */
-            .stMarkdown p, .stMarkdown span, .stMarkdown div, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-                color: #E8E8E8 !important;
-            }
-            
-            /* Correção para Tooltips e Toasts (fundo branco do navegador/streamlit) */
-            div[data-baseweb="tooltip"], div[data-baseweb="toast"], .stToast {
-                color: #333333 !important;
-            }
-            div[data-baseweb="tooltip"] div, div[data-baseweb="toast"] div {
-                color: #333333 !important;
-            }
-            
-            /* Correção para textos azuis (links, info boxes) */
-            a, .stMarkdown a {
-                color: #FFFFFF !important; /* Branco */
-            }
-            a:hover, .stMarkdown a:hover {
-                color: #E87722 !important; /* Laranja no hover */
-            }
-            /* Info boxes com texto azul */
-            .stAlert[data-baseweb="notification"] {
-                background-color: #1e3a5f !important;
-                border-left-color: #60A5FA !important;
-            }
-            .stAlert[data-baseweb="notification"] * {
-                color: #E8E8E8 !important;
-            }
-            /* Info boxes */
-            .stAlert {
-                background-color: #2d3748;
-                color: #E8E8E8;
-                border-left-color: #4299E1;
-            }
-            /* Tabelas */
-            .dataframe {
-                background-color: #2d3748 !important;
-                color: #E8E8E8 !important;
-            }
-            .dataframe th {
-                background-color: #1a202c !important;
-                color: #FFFFFF !important;
-            }
-            .dataframe td {
-                color: #E8E8E8 !important;
-            }
-            /* Inputs */
-            .stTextInput input, .stSelectbox select, .stMultiSelect {
-                background-color: #2d3748 !important;
-                color: #FFFFFF !important;
-                border-color: #4a5568 !important;
-            }
-            /* Slider */
-            .stSlider {
-                color: #E8E8E8;
-            }
-            /* Divider */
-            hr {
-                border-color: #4a5568 !important;
-            }
-            /* Expander */
-            .streamlit-expanderHeader {
-                background-color: #2d3748 !important;
-                color: #FFFFFF !important;
-            }
-            /* Botões do Streamlit */
-            .stButton button {
-                background-color: #E87722 !important;
-                color: white !important;
-                border: 1px solid #E87722 !important;
-            }
-            .stButton button:hover {
-                background-color: #d16615 !important;
-                border: 1px solid #d16615 !important;
-            }
-            /* Botões secundários */
-            .stButton button[kind="secondary"] {
-                background-color: #4a5568 !important;
-                color: #FFFFFF !important;
-                border: 1px solid #718096 !important;
-            }
-            .stButton button[kind="secondary"]:hover {
-                background-color: #2d3748 !important;
-                border: 1px solid #4a5568 !important;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-    
-    st.divider()
-    st.markdown("### Nova Análise")
-    uploaded_files = st.file_uploader(
-        "Anexar Arquivos", 
-        type=["xlsx", "xls"], 
-        accept_multiple_files=True,
-        label_visibility="collapsed"
-    )
-    
-    limiar = st.slider("Sensibilidade do Match (%)", 0, 100, 65)
-    
-    if uploaded_files and len(uploaded_files) >= 2:
-        processar = st.button("Processar Análise", type="primary", use_container_width=True)
-    else:
-        st.info("Anexe pelo menos 2 arquivos.")
-        processar = False
-    
-    # --- Histórico de Análises ---
-    st.divider()
-    st.markdown("### Histórico")
-    
-    history_list = load_history_list()
-    
-    if history_list:
-        st.caption(f"{len(history_list)} análise(s) salva(s)")
+# Aplica CSS dinâmico baseado no tema
+if dark_mode:
+    st.markdown("""
+        <style>
+        /* Dark Mode Premium */
+        .stApp {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #E8E8E8;
+        }
+        .block-container {
+            background-color: transparent;
+        }
+        /* Header/Toolbar */
+        .stAppHeader {
+            background-color: #0f172a !important;
+            border-bottom: 1px solid #334155;
+        }
+        header[data-testid="stHeader"] {
+            background-color: #0f172a !important;
+        }
+        /* Títulos */
+        h1, h2, h3, h4, h5, h6 {
+            color: #FFFFFF !important;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        /* Cards KPI */
+        div[data-testid="stMetric"] {
+            background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+            color: #FFFFFF;
+            border-left: 5px solid #E87722;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        div[data-testid="stMetric"] label {
+            color: #A0AEC0 !important;
+            font-weight: 600;
+        }
+        div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+            color: #FFFFFF !important;
+        }
+        div[data-testid="stMetric"] [data-testid="stMetricDelta"] {
+            color: #48BB78 !important;
+        }
         
-        for idx, metadata in enumerate(history_list):
-            with st.expander(f"{metadata['data_formatada']}", expanded=False):
-                st.markdown(f"**Saída:** `{metadata['arquivo_saida']}`")
-                st.markdown(f"**Entrada:** `{metadata['arquivo_entrada']}`")
-                st.markdown(f"**Total:** {metadata['total_itens']} itens")
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("Carregar", key=f"load_{metadata['id']}", use_container_width=True):
+        /* Textos gerais */
+        .stMarkdown p, .stMarkdown span, .stMarkdown div, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+            color: #E8E8E8 !important;
+        }
+        
+        /* Correção para Tooltips e Toasts */
+        div[data-baseweb="tooltip"], div[data-baseweb="toast"], .stToast {
+            color: #333333 !important;
+        }
+        div[data-baseweb="tooltip"] div, div[data-baseweb="toast"] div {
+            color: #333333 !important;
+        }
+        
+        /* Links */
+        a, .stMarkdown a {
+            color: #FFFFFF !important;
+        }
+        a:hover, .stMarkdown a:hover {
+            color: #E87722 !important;
+        }
+        
+        /* Info boxes */
+        .stAlert {
+            background-color: #2d3748;
+            color: #E8E8E8;
+            border-left-color: #4299E1;
+        }
+        
+        /* Tabelas */
+        .dataframe {
+            background-color: #2d3748 !important;
+            color: #E8E8E8 !important;
+        }
+        .dataframe th {
+            background-color: #1a202c !important;
+            color: #FFFFFF !important;
+        }
+        .dataframe td {
+            color: #E8E8E8 !important;
+        }
+        
+        /* Inputs */
+        .stTextInput input, .stSelectbox select, .stMultiSelect {
+            background-color: #2d3748 !important;
+            color: #FFFFFF !important;
+            border-color: #4a5568 !important;
+        }
+        
+        /* Slider */
+        .stSlider {
+            color: #E8E8E8;
+        }
+        
+        /* Divider */
+        hr {
+            border-color: #4a5568 !important;
+        }
+        
+        /* Expander */
+        .streamlit-expanderHeader {
+            background-color: #2d3748 !important;
+            color: #FFFFFF !important;
+        }
+        
+        /* Botões */
+        .stButton button {
+            background-color: #E87722 !important;
+            color: white !important;
+            border: 1px solid #E87722 !important;
+        }
+        .stButton button:hover {
+            background-color: #d16615 !important;
+            border: 1px solid #d16615 !important;
+        }
+        .stButton button[kind="secondary"] {
+            background-color: #4a5568 !important;
+            color: #FFFFFF !important;
+            border: 1px solid #718096 !important;
+        }
+        .stButton button[kind="secondary"]:hover {
+            background-color: #2d3748 !important;
+            border: 1px solid #4a5568 !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+# --- CONFIGURAÇÃO E UPLOADS (EXPANDER) ---
+# Expandido se NÃO tiver resultado ainda
+expander_open = st.session_state.df_resultado is None
+with st.expander("📁 Upload e Configurações da Análise", expanded=expander_open):
+    col_up, col_param = st.columns([2, 1])
+    
+    with col_up:
+        uploaded_files = st.file_uploader(
+            "Anexar Arquivos (XLSX/XLS)", 
+            type=["xlsx", "xls"], 
+            accept_multiple_files=True,
+            label_visibility="collapsed"
+        )
+    
+    with col_param:
+        limiar = st.slider("Sensibilidade do Match (%)", 0, 100, 65)
+        
+        if uploaded_files and len(uploaded_files) >= 2:
+            processar = st.button("🚀 Processar Análise", type="primary", use_container_width=True)
+        else:
+            if not uploaded_files:
+                st.caption("Anexe arquivos para começar.")
+            elif len(uploaded_files) < 2:
+                st.caption("Mínimo 2 arquivos.")
+            processar = False
+
+# --- HISTÓRICO E CONSOLIDAÇÃO ---
+# Layout em duas colunas para economizar espaço vertical
+col_hist, col_consol = st.columns(2)
+
+with col_hist:
+    with st.expander("📜 Histórico de Análises Salvas", expanded=False):
+        history_list = load_history_list()
+        
+        if history_list:
+            st.caption(f"{len(history_list)} análises disponíveis.")
+            for idx, metadata in enumerate(history_list):
+                # Container simples para cada item
+                c1, c2, c3 = st.columns([3, 1, 1])
+                with c1:
+                    st.markdown(f"**{metadata['data_formatada']}**\n\nItens: {metadata['total_itens']}")
+                with c2:
+                    if st.button("Abrir", key=f"load_{metadata['id']}", use_container_width=True):
                         df_loaded, meta_loaded = load_analysis_from_history(metadata['id'])
                         if df_loaded is not None:
                             st.session_state.df_resultado = df_loaded
                             st.session_state.current_metadata = meta_loaded
                             st.rerun()
-                with col2:
-                    if st.button("Excluir", key=f"del_{metadata['id']}", use_container_width=True):
+                with c3:
+                     if st.button("🗑️", key=f"del_{metadata['id']}", use_container_width=True, help="Excluir"):
                         if delete_analysis_from_history(metadata['id']):
-                            st.toast("🗑️ Análise excluída!", icon="🗑️")
+                            st.toast("Análise excluída!")
                             st.rerun()
-    else:
-        st.caption("Nenhuma análise salva ainda.")
-    
-    # --- Análise Consolidada ---
-    st.divider()
-    st.markdown("### Análise Consolidada")
-    
-    if len(history_list) >= 2:
-        st.caption("Mescle múltiplas análises em uma única visualização")
-        
-        # Seletor de análises para consolidar
-        analises_disponiveis = {}
-        for idx, meta in enumerate(history_list):
-            # Cria label único com índice para evitar duplicatas
-            label = f"{meta['data_formatada']} - {meta['total_itens']} itens"
-            analises_disponiveis[label] = meta['id']
-        
-        analises_selecionadas = st.multiselect(
-            "Selecione as análises",
-            options=list(analises_disponiveis.keys()),
-            default=[],
-            key="multiselect_consolidacao",
-            help="Escolha 2 ou mais análises para consolidar"
-        )
-        
-        if len(analises_selecionadas) >= 2:
-            if st.button("Consolidar Análises", type="primary", use_container_width=True):
-                with st.spinner("Consolidando e reanalisando..."):
-                    # Nota: Esta funcionalidade requer que os arquivos originais ainda existam
-                    # Como os arquivos Excel são temporários (uploaded), vamos mesclar os DataFrames
-                    # de resultados já processados, mas informar ao usuário sobre a limitação
-                    
-                    dfs_saida = []
-                    dfs_entrada = []
-                    
-                    for nome_analise in analises_selecionadas:
-                        analise_id = analises_disponiveis[nome_analise]
-                        df_loaded, meta = load_analysis_from_history(analise_id)
-                        
-                        if df_loaded is not None:
-                            # Separa os dados de saída e entrada dos resultados
-                            # Cria DataFrames sintéticos de saída e entrada baseados nos resultados
-                            df_saida_temp = df_loaded[df_loaded['Produto (Saída)'] != '-'][
-                                ['Data', 'Unidade Origem', 'Unidade Destino', 'Documento', 
-                                 'Produto (Saída)', 'Espécie', 'Valor Saída (R$)', 'Qtd Saída']
-                            ].copy()
-                            df_saida_temp.columns = ['data', 'unidade_origem', 'unidade_destino', 'doc_num', 
-                                                     'ds_produto', 'especie', 'valor_total', 'qt_entrada']
-                            
-                            df_entrada_temp = df_loaded[df_loaded['Produto (Entrada)'] != '-'][
-                                ['Data', 'Unidade Origem', 'Unidade Destino', 'Documento', 
-                                 'Produto (Entrada)', 'Espécie', 'Valor Entrada (R$)', 'Qtd Entrada']
-                            ].copy()
-                            df_entrada_temp.columns = ['data', 'unidade_origem', 'unidade_destino', 'doc_num', 
-                                                       'ds_produto', 'especie', 'valor_total', 'qt_entrada']
-                            
-                            dfs_saida.append(df_saida_temp)
-                            dfs_entrada.append(df_entrada_temp)
-                    
-                    if dfs_saida and dfs_entrada:
-                        # Mescla todos os DataFrames de saída e entrada
-                        df_saida_consolidado = pd.concat(dfs_saida, ignore_index=True).drop_duplicates()
-                        df_entrada_consolidado = pd.concat(dfs_entrada, ignore_index=True).drop_duplicates()
-                        
-                        # Reanalisa do zero
-                        progress_bar = st.progress(0, text="Reanalisando dados consolidados...")
-                        df_resultado_consolidado, stats = analisar_itens(
-                            df_saida_consolidado, 
-                            df_entrada_consolidado, 
-                            limiar_similaridade=65,  # Usa limiar padrão
-                            progress_bar=progress_bar
-                        )
-                        progress_bar.empty()
-                        
-                        # Salva no session state
-                        st.session_state.df_resultado = df_resultado_consolidado
-                        st.session_state.current_metadata = {
-                            'arquivo_saida': 'Consolidado',
-                            'arquivo_entrada': 'Consolidado',
-                            'data_formatada': f"Consolidado ({len(analises_selecionadas)} análises - Reanalisado)"
-                        }
-                        
-                        st.toast(f"✅ {len(analises_selecionadas)} análises consolidadas e reanalisadas com sucesso!", icon="✅")
-                        st.toast(f"📊 Total de {len(df_resultado_consolidado)} itens analisados", icon="📊")
-                        st.rerun()
-                    else:
-                        st.error("Erro ao carregar dados das análises selecionadas")
+                st.divider()
         else:
-            st.info("Selecione pelo menos 2 análises para consolidar")
-    else:
-        st.caption("Salve pelo menos 2 análises para usar esta funcionalidade")
+            st.info("Nenhuma análise salva.")
+
+with col_consol:
+    with st.expander("📊 Consolidação de Análises", expanded=False):
+        if history_list and len(history_list) >= 2:
+            analises_disponiveis = {}
+            for idx, meta in enumerate(history_list):
+                label = f"{meta['data_formatada']} ({meta['total_itens']} itens)"
+                analises_disponiveis[label] = meta['id']
+            
+            analises_selecionadas = st.multiselect(
+                "Selecione para consolidar:",
+                options=list(analises_disponiveis.keys()),
+                default=[],
+                key="multiselect_consolidacao"
+            )
+            
+            if len(analises_selecionadas) >= 2:
+                if st.button("Mesclar e Reanalisar", type="primary", use_container_width=True):
+                     with st.spinner("Consolidando..."):
+                        dfs_saida = []
+                        dfs_entrada = []
+                        
+                        for nome_analise in analises_selecionadas:
+                            analise_id = analises_disponiveis[nome_analise]
+                            df_loaded, meta = load_analysis_from_history(analise_id)
+                            
+                            if df_loaded is not None:
+                                # Reconstrói estruturas baseadas no dataframe carregado
+                                # (Lógica simplificada para reconstrução)
+                                df_saida_temp = df_loaded[df_loaded['Produto (Saída)'] != '-'][
+                                    ['Data', 'Unidade Origem', 'Unidade Destino', 'Documento', 
+                                     'Produto (Saída)', 'Espécie', 'Valor Saída (R$)', 'Qtd Saída']
+                                ].copy()
+                                df_saida_temp.columns = ['data', 'unidade_origem', 'unidade_destino', 'doc_num', 
+                                                         'ds_produto', 'especie', 'valor_total', 'qt_entrada']
+                                
+                                df_entrada_temp = df_loaded[df_loaded['Produto (Entrada)'] != '-'][
+                                    ['Data', 'Unidade Origem', 'Unidade Destino', 'Documento', 
+                                     'Produto (Entrada)', 'Espécie', 'Valor Entrada (R$)', 'Qtd Entrada']
+                                ].copy()
+                                df_entrada_temp.columns = ['data', 'unidade_origem', 'unidade_destino', 'doc_num', 
+                                                           'ds_produto', 'especie', 'valor_total', 'qt_entrada']
+                                
+                                dfs_saida.append(df_saida_temp)
+                                dfs_entrada.append(df_entrada_temp)
+                        
+                        if dfs_saida and dfs_entrada:
+                            df_saida_consolidado = pd.concat(dfs_saida, ignore_index=True).drop_duplicates()
+                            df_entrada_consolidado = pd.concat(dfs_entrada, ignore_index=True).drop_duplicates()
+                            
+                            progress_bar = st.progress(0, text="Processando consolidação...")
+                            df_resultado_consolidado, stats = analisar_itens(
+                                df_saida_consolidado, 
+                                df_entrada_consolidado, 
+                                limiar_similaridade=65, 
+                                progress_bar=progress_bar
+                            )
+                            progress_bar.empty()
+                            
+                            st.session_state.df_resultado = df_resultado_consolidado
+                            st.session_state.current_metadata = {
+                                'arquivo_saida': 'Consolidado',
+                                'arquivo_entrada': 'Consolidado',
+                                'data_formatada': f"Consolidado ({len(analises_selecionadas)} análises)"
+                            }
+                            st.rerun()
+        else:
+            st.caption("Necessário ter pelo menos 2 análises salvas.")
 
 # --- Lógica de Processamento ---
 if 'df_resultado' not in st.session_state:
@@ -1513,23 +1659,24 @@ if st.session_state.df_resultado is not None:
         
     st.info(f"📅 **Período Apurado:** {periodo_str}")
     
-    # --- Filtros na Sidebar ---
-    with st.sidebar:
-        st.divider()
-        st.header("🔍 Filtros")
+    # --- Filtros no Topo dos Resultados ---
+    with st.expander("🔍 Filtros do Dashboard", expanded=False):
+        c_filt1, c_filt2, c_filt3 = st.columns(3)
+        with c_filt1:
+            # Filtro de Status
+            status_options = df['Status'].unique()
+            status_filter = st.multiselect("Status", status_options, default=status_options)
         
-        # Filtro de Status
-        status_options = df['Status'].unique()
-        status_filter = st.multiselect("Status", status_options, default=status_options)
-        
-        # Filtro de Unidade
-        unidades = sorted(list(set(df['Unidade Origem'].unique()) | set(df['Unidade Destino'].unique())))
-        unidade_filter = st.multiselect("Unidade (Origem/Destino)", unidades)
-        
-        # Filtro de Data
-        min_date = df['Data'].min()
-        max_date = df['Data'].max()
-        date_range = st.date_input("Período", [min_date, max_date])
+        with c_filt2:
+            # Filtro de Unidade
+            unidades = sorted(list(set(df['Unidade Origem'].unique()) | set(df['Unidade Destino'].unique())))
+            unidade_filter = st.multiselect("Unidade (Origem/Destino)", unidades)
+            
+        with c_filt3:
+            # Filtro de Data
+            min_date = df['Data'].min()
+            max_date = df['Data'].max()
+            date_range = st.date_input("Período", [min_date, max_date])
     
     # Aplica Filtros
     df_filtered = df[df['Status'].isin(status_filter)]

@@ -139,9 +139,63 @@ def _parse_date_column(series):
         return pd.to_datetime(series, unit='d', origin='1899-12-30', errors='coerce')
     return pd.to_datetime(series, dayfirst=True, errors='coerce')
 
+def normalizar_unidade_medida(texto):
+    """Normaliza unidades de medida para formato padrão."""
+    mapeamento = {
+        'GR': 'G',
+        'GRAMA': 'G',
+        'GRAMAS': 'G',
+        'MILIGRAMA': 'MG',
+        'MILIGRAMAS': 'MG',
+        'MILILITRO': 'ML',
+        'MILILITROS': 'ML',
+        'MICROGRAMA': 'MCG',
+        'MICROGRAMAS': 'MCG',
+        'UNIDADE': 'UI',
+        'UNIDADES': 'UI',
+        'LITRO': 'L',
+        'LITROS': 'L',
+        'METRO': 'M',
+        'METROS': 'M',
+        'CENTIMETRO': 'CM',
+        'CENTIMETROS': 'CM',
+        'MILIMETRO': 'MM',
+        'MILIMETROS': 'MM'
+    }
+    
+    texto_norm = texto.upper()
+    for variacao, padrao in mapeamento.items():
+        texto_norm = re.sub(r'\b' + variacao + r'\b', padrao, texto_norm)
+    
+    return texto_norm
+
+def normalizar_dimensao(dimensao_str):
+    """Normaliza dimensões para comparação consistente."""
+    dimensao_str = re.sub(r'\s+', '', dimensao_str.upper())
+    numeros = re.findall(r'\d+\.?\d*', dimensao_str)
+    numeros_norm = [str(float(n)) for n in numeros if n]
+    return 'X'.join(sorted(numeros_norm))
+
+def extrair_e_normalizar_concentracao(descricao):
+    """Extrai concentração e normaliza para formato comparável."""
+    descricao = normalizar_unidade_medida(descricao)
+    padroes = [
+        r'(\d+[,.]?\d*)\s*(MG|G|ML|MCG|UI|L|%)\s*/\s*(\d+[,.]?\d*)\s*(MG|G|ML|MCG|UI|L)',
+        r'(\d+[,.]?\d*)\s*(MG|G|ML|MCG|UI|L|%)(?!\s*/)',
+    ]
+    concentracoes = []
+    for padrao in padroes:
+        matches = re.findall(padrao, descricao)
+        for match in matches:
+            if isinstance(match, tuple):
+                conc_str = ''.join(str(c) for c in match).replace(',', '.')
+                concentracoes.append(conc_str)
+    return ' '.join(concentracoes) if concentracoes else ''
+
 def extrair_componentes_produto(descricao):
     """Extrai componentes principais do produto para matching inteligente."""
     descricao = str(descricao).upper().strip()
+    descricao = normalizar_unidade_medida(descricao)
     
     componentes = {
         'original': descricao,
@@ -151,6 +205,7 @@ def extrair_componentes_produto(descricao):
         'apresentacao': '',
         'quantidade': '',
         'unidade_medida': '',
+        'dimensao': '',
         'palavras_chave': []
     }
     
@@ -159,10 +214,8 @@ def extrair_componentes_produto(descricao):
     texto_limpo = re.sub(r'\s+', ' ', texto_limpo).strip()
     componentes['normalizado'] = texto_limpo
     
-    # Extrai concentração
-    concentracoes = re.findall(r'\d+[,.]?\d*\s*(?:MG|G|ML|MCG|UI|%|MG/ML|G/ML)', descricao)
-    if concentracoes:
-        componentes['concentracao'] = ' '.join(concentracoes)
+    # Extrai concentração usando função melhorada
+    componentes['concentracao'] = extrair_e_normalizar_concentracao(descricao)
     
     # Extrai apresentação
     apresentacoes = [
@@ -181,6 +234,11 @@ def extrair_componentes_produto(descricao):
     if qtd_match:
         componentes['quantidade'] = qtd_match.group(1)
     
+    # Extrai dimensões
+    dimensoes = re.search(r'\d+\.?\d*\s*[xX]\s*\d+\.?\d*', descricao)
+    if dimensoes:
+        componentes['dimensao'] = normalizar_dimensao(dimensoes.group())
+    
     # Extrai palavras-chave
     stopwords = [
         'DE', 'DA', 'DO', 'COM', 'PARA', 'EM', 'A', 'O', 'E', 'C/',
@@ -196,10 +254,60 @@ def extrair_componentes_produto(descricao):
     
     return componentes
 
-def calcular_similaridade_precalc(comp1, comp2):
+def calcular_similaridade_precalc(comp1, comp2, ignore_penalties=False):
     """Calcula similaridade usando componentes pré-calculados."""
     score = 0
     detalhes = []
+    
+    # 0. Verificação de Sinônimos
+    sinonimos = {
+        'AVENTAL': ['CAPOTE', 'AVENTAL', 'JALECO'],
+        'CAPOTE': ['AVENTAL', 'CAPOTE', 'JALECO'],
+        'JALECO': ['AVENTAL', 'CAPOTE', 'JALECO'],
+        'ALGODAO': ['POLYCOT', 'ALGODAO', 'COTTON'],
+        'POLYCOT': ['ALGODAO', 'POLYCOT', 'COTTON'],
+        'COTTON': ['ALGODAO', 'POLYCOT', 'COTTON'],
+        'GAZE': ['COMPRESSA', 'GAZE'],
+        'COMPRESSA': ['GAZE', 'COMPRESSA'],
+        'SORO': ['SOLUCAO', 'SORO', 'SOL'],
+        'SOLUCAO': ['SORO', 'SOLUCAO', 'SOL'],
+        'SOL': ['SORO', 'SOLUCAO', 'SOL'],
+        'SALINA': ['NACL', 'CLORETO', 'SALINA', 'SF'],
+        'NACL': ['SALINA', 'CLORETO', 'NACL', 'SF'],
+        'SF': ['SALINA', 'NACL', 'CLORETO', 'SF'],
+        'AMPOLA': ['AMP', 'AMPOLA', 'FRAMP', 'FRASCOAMPOLA'],
+        'AMP': ['AMPOLA', 'AMP', 'FRAMP', 'FRASCOAMPOLA'],
+        'FRAMP': ['AMP', 'AMPOLA', 'FRAMP', 'FRASCOAMPOLA'],
+        'FRASCOAMPOLA': ['AMP', 'AMPOLA', 'FRAMP', 'FRASCOAMPOLA'],
+        'COMPRIMIDO': ['COMP', 'CP', 'COMPRIMIDO', 'DRAGEA'],
+        'COMP': ['COMPRIMIDO', 'COMP', 'CP', 'DRAGEA'],
+        'CP': ['COMPRIMIDO', 'COMP', 'CP', 'DRAGEA'],
+        'CAPSULA': ['CAPS', 'CAPSULA', 'CAP'],
+        'CAPS': ['CAPSULA', 'CAPS', 'CAP'],
+        'CAP': ['CAPSULA', 'CAPS', 'CAP'],
+        'INJETAVEL': ['INJ', 'INJETAVEL', 'IV', 'IM', 'SC'],
+        'INJ': ['INJETAVEL', 'INJ', 'IV', 'IM', 'SC'],
+        'ORAL': ['VO', 'ORAL', 'BUCAL'],
+        'VO': ['ORAL', 'VO', 'BUCAL'],
+        'DIPIRONA': ['METAMIZOL', 'DIPIRONA', 'NOVALGINA'],
+        'METAMIZOL': ['DIPIRONA', 'METAMIZOL', 'NOVALGINA'],
+        'PARACETAMOL': ['ACETAMINOFENO', 'PARACETAMOL'],
+        'ACETAMINOFENO': ['PARACETAMOL', 'ACETAMINOFENO'],
+        'OMEPRAZOL': ['OMEPRAZOL', 'LOSEC'],
+        'DICLOFENACO': ['DICLOFENACO', 'VOLTAREN', 'CATAFLAM'],
+        'GLICOSE': ['DEXTROSE', 'GLICOSE'],
+        'DEXTROSE': ['GLICOSE', 'DEXTROSE'],
+    }
+    
+    tem_sinonimo = False
+    for termo, lista_sin in sinonimos.items():
+        if termo in comp1['normalizado'] and any(s in comp2['normalizado'] for s in lista_sin):
+            tem_sinonimo = True
+            break
+    
+    if tem_sinonimo:
+        score += 15
+        detalhes.append("Sinônimo:✓")
     
     # 1. Similaridade textual geral (30%)
     sim_geral = SequenceMatcher(None, comp1['normalizado'], comp2['normalizado']).ratio()
@@ -214,14 +322,47 @@ def calcular_similaridade_precalc(comp1, comp2):
     
     # 3. Concentração (20%)
     if comp1['concentracao'] and comp2['concentracao']:
-        if comp1['concentracao'] == comp2['concentracao']:
+        c1 = comp1['concentracao'].replace(' ', '').upper()
+        c2 = comp2['concentracao'].replace(' ', '').upper()
+        if c1 == c2:
             score += 20
             detalhes.append(f"Conc:✓")
         else:
-            sim_conc = SequenceMatcher(None, comp1['concentracao'], comp2['concentracao']).ratio()
-            if sim_conc > 0.7:
-                score += sim_conc * 20
-                detalhes.append(f"Conc:~{sim_conc:.0%}")
+            nums1 = re.findall(r'\d+\.?\d*', c1)
+            nums2 = re.findall(r'\d+\.?\d*', c2)
+            nums_comum = set(nums1) & set(nums2)
+            if nums_comum and len(nums_comum) >= len(nums1) * 0.5:
+                score += 15
+                detalhes.append(f"Conc:~")
+            else:
+                sim_conc = SequenceMatcher(None, c1, c2).ratio()
+                if sim_conc > 0.7:
+                    score += sim_conc * 15
+                    detalhes.append(f"Conc:~{sim_conc:.0%}")
+                elif not ignore_penalties:
+                    score -= 25
+                    detalhes.append(f"Conc:Mismatch")
+    
+    # 3.5. Dimensão (importante para agulhas)
+    if 'dimensao' in comp1 and 'dimensao' in comp2 and comp1['dimensao'] and comp2['dimensao']:
+        d1_norm = comp1['dimensao']
+        d2_norm = comp2['dimensao']
+        if d1_norm == d2_norm:
+            score += 15
+            detalhes.append(f"Dim:✓")
+        else:
+            nums1 = set(d1_norm.split('X'))
+            nums2 = set(d2_norm.split('X'))
+            comum = nums1 & nums2
+            if len(comum) >= 2:
+                score += 10
+                detalhes.append(f"Dim:~")
+            elif len(comum) >= 1:
+                score += 5
+                detalhes.append(f"Dim:part")
+            elif not ignore_penalties:
+                score -= 15
+                detalhes.append(f"Dim:Mismatch")
     
     # 4. Apresentação (10%)
     if comp1['apresentacao'] and comp2['apresentacao']:
@@ -250,6 +391,22 @@ def calcular_similaridade_precalc(comp1, comp2):
         detalhes.append(f"Palavras:{len(palavras_comum)}")
     
     return score, ' | '.join(detalhes)
+
+def validar_match_quantidade(qtd_saida, qtd_entrada, score_produto, doc_match):
+    """Valida se o match de quantidade faz sentido para evitar falsos positivos."""
+    if abs(qtd_saida - qtd_entrada) < 0.01:
+        return True, 0.0
+    qtd_max = max(qtd_saida, qtd_entrada)
+    if qtd_max == 0:
+        return True, 0.0
+    perc_diff = abs(qtd_saida - qtd_entrada) / qtd_max * 100
+    if doc_match and score_produto >= 85:
+        if perc_diff <= 20:
+            return True, qtd_saida - qtd_entrada
+    if not doc_match:
+        if perc_diff > 10:
+            return False, None
+    return True, qtd_saida - qtd_entrada
 
 def eh_casa_portugal(unidade):
     unidade_norm = str(unidade).upper().strip()
@@ -325,55 +482,73 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
         # ESTRATÉGIA DE BUSCA INTELIGENTE
         candidatos_idx = []
         match_agregado = None
+        candidatos = pd.DataFrame()  # Inicializa vazio por padrão
+        documento_nao_encontrado = False  # Flag para prevenir fallback
         
         # 1. Se tem documento e não é Casa Portugal, busca por documento primeiro
-        if doc_num and not destino_eh_cp and doc_num in doc_index:
-            candidatos_idx = doc_index[doc_num]
-            # Filtra apenas não processados para agregação
-            candidatos_disponiveis = [i for i in candidatos_idx if i not in entradas_processadas]
-            
-            # Tenta AGREGAÇÃO (One-to-Many) se houver múltiplos candidatos do mesmo produto
-            matches_doc_prod = []
-            for idx_e in candidatos_disponiveis:
-                row_e = df_entrada.loc[idx_e]
-                score_prod, _ = calcular_similaridade_precalc(comp_s, row_e['comps'])
-                if score_prod >= 85:  # Alta similaridade de produto
-                    matches_doc_prod.append((idx_e, row_e, score_prod))
-            
-            # Se encontrou mais de 1 item ou se o único item tem quantidade menor que a saída (parcial)
-            if matches_doc_prod:
-                qtd_total_entrada = sum(float(m[1].get('qt_entrada', 0)) for m in matches_doc_prod)
+        if doc_num and not destino_eh_cp:
+            if doc_num in doc_index:
+                candidatos_idx = doc_index[doc_num]
+                # Filtra apenas não processados para agregação
+                candidatos_disponiveis = [i for i in candidatos_idx if i not in entradas_processadas]
                 
-                # Se a soma das quantidades bate melhor com a saída ou se são múltiplos itens
-                if len(matches_doc_prod) > 1 or (abs(qtd_total_entrada - qtd_s) < abs(float(matches_doc_prod[0][1].get('qt_entrada', 0)) - qtd_s)):
+                # Tenta AGREGAÇÃO (One-to-Many) se houver múltiplos candidatos do mesmo produto
+                matches_doc_prod = []
+                for idx_e in candidatos_disponiveis:
+                    row_e = df_entrada.loc[idx_e]
+                    qtd_e = float(row_e.get('qt_entrada', 0))
                     
-                    valor_total_entrada = sum(float(m[1]['valor_total']) for m in matches_doc_prod)
+                    # CRITICAL: Valida qualidade do match baseado na quantidade
+                    # Se quantidade bate exata, aceita threshold menor (70%)
+                    # Se quantidade difere, exige threshold maior (85%) para evitar matches incorretos
+                    qtd_match_exato = abs(qtd_e - qtd_s) < 0.01
+                    limiar_doc = 70 if qtd_match_exato else 85
                     
-                    # Cria um "row" virtual agregado
-                    row_virtual = matches_doc_prod[0][1].copy()
-                    row_virtual['qt_entrada'] = qtd_total_entrada
-                    row_virtual['valor_total'] = valor_total_entrada
-                    row_virtual['ds_produto'] = f"{row_virtual['ds_produto']} (+ {len(matches_doc_prod)-1} itens)"
+                    score_prod, _ = calcular_similaridade_precalc(comp_s, row_e['comps'])
+                    if score_prod >= limiar_doc:
+                        matches_doc_prod.append((idx_e, row_e, score_prod))
+                
+                # Se encontrou mais de 1 item ou se o único item tem quantidade menor que a saída (parcial)
+                if matches_doc_prod:
+                    qtd_total_entrada = sum(float(m[1].get('qt_entrada', 0)) for m in matches_doc_prod)
                     
-                    match_agregado = {
-                        'indices': [m[0] for m in matches_doc_prod],
-                        'row': row_virtual,
-                        'score': 100, # Match confirmado por doc + produto
-                        'score_produto': matches_doc_prod[0][2],
-                        'detalhes': f"Agregado: {len(matches_doc_prod)} itens (Doc:{doc_num})",
-                        'detalhes_produto': "Múltiplos itens somados"
-                    }
+                    # Se a soma das quantidades bate melhor com a saída ou se são múltiplos itens
+                    if len(matches_doc_prod) > 1 or (abs(qtd_total_entrada - qtd_s) < abs(float(matches_doc_prod[0][1].get('qt_entrada', 0)) - qtd_s)):
+                        
+                        valor_total_entrada = sum(float(m[1]['valor_total']) for m in matches_doc_prod)
+                        
+                        # Cria um "row" virtual agregado
+                        row_virtual = matches_doc_prod[0][1].copy()
+                        row_virtual['qt_entrada'] = qtd_total_entrada
+                        row_virtual['valor_total'] = valor_total_entrada
+                        row_virtual['ds_produto'] = f"{row_virtual['ds_produto']} (+ {len(matches_doc_prod)-1} itens)"
+                        
+                        match_agregado = {
+                            'indices': [m[0] for m in matches_doc_prod],
+                            'row': row_virtual,
+                            'score': 100, # Match confirmado por doc + produto
+                            'score_produto': matches_doc_prod[0][2],
+                            'detalhes': f"Agregado: {len(matches_doc_prod)} itens (Doc:{doc_num})",
+                            'detalhes_produto': "Múltiplos itens somados"
+                        }
 
-            # Define candidatos para busca normal (caso não use o agregado ou para comparação)
-            candidatos = df_entrada.loc[candidatos_idx]
-        else:
-            # 2. Senão, filtra por janela de data
-            if pd.notna(data_s):
-                mask_data = (df_entrada['data'] >= data_s - pd.Timedelta(days=30)) & \
-                            (df_entrada['data'] <= data_s + pd.Timedelta(days=30))
-                candidatos = df_entrada[mask_data]
+                # Define candidatos para busca normal (caso não use o agregado ou para comparação)
+                candidatos = df_entrada.loc[candidatos_idx]
             else:
-                candidatos = df_entrada
+                # Documento não encontrado na entrada - marca como não encontrado
+                candidatos = pd.DataFrame()  # DataFrame vazio
+                documento_nao_encontrado = True  # CRITICAL: Previne fallback
+        else:
+            # 2. Senão, filtra por janela de data (fallback)
+            # IMPORTANTE: Só faz fallback se o documento não existia (não foi "não encontrado")
+            if not documento_nao_encontrado:
+                if pd.notna(data_s):
+                    mask_data = (df_entrada['data'] >= data_s - pd.Timedelta(days=30)) & \
+                                (df_entrada['data'] <= data_s + pd.Timedelta(days=30))
+                    candidatos = df_entrada[mask_data]
+                else:
+                    candidatos = df_entrada
+            # Se documento_nao_encontrado=True, candidatos já está vazio
         
         # Se ainda tem muitos candidatos, limita aos 100 mais recentes
         if len(candidatos) > 100:

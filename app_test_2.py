@@ -1243,7 +1243,6 @@ with col_title:
 expander_open = st.session_state.df_resultado is None
 
 if expander_open:
-    st.info("Faça o upload dos arquivos abaixo para começar.")
     st.markdown("""
     ### Instruções:
     1.  Arraste os arquivos de **Saída** e **Entrada** para a área de upload.

@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 # Configuração da página
 st.set_page_config(
     page_title="Análise de Empréstimos Hospitalares",
-    page_icon="🏥",
+    page_icon="page_icon.png",
     layout="wide"
 )
 

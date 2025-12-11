@@ -1386,7 +1386,8 @@ if processar and uploaded_files:
         # Salva no histórico
         analysis_id = save_analysis_to_history(df_res, stats, nome_saida, nome_entrada)
         if analysis_id:
-            st.toast("Análise salva no histórico!")
+            # st.toast("Análise salva no histórico!")
+            pass
         
         st.session_state.df_resultado = df_res
         st.session_state.current_metadata = {
@@ -1394,7 +1395,7 @@ if processar and uploaded_files:
             'arquivo_entrada': nome_entrada,
             'data_formatada': datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         }
-        st.toast("✅ Análise concluída!", icon="✅")
+        st.toast("Análise concluída!", icon="✅")
 
 # --- Dashboard ---
 if st.session_state.df_resultado is not None:

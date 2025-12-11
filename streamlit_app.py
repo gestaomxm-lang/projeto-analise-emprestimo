@@ -1616,9 +1616,9 @@ if st.session_state.df_resultado is not None:
             with col_res3:
                 st.metric("Divergência Total", f"{abs(total_falta) + total_sobra:.0f} unidades")
     
-    # Define cor do texto dos gráficos baseada no tema
-    chart_text_color = '#FFFFFF' if dark_mode else '#001A72'
-    chart_grid_color = 'rgba(255,255,255,0.1)' if dark_mode else 'rgba(128,128,128,0.2)'
+    # Define cor do texto dos gráficos (sempre claro)
+    chart_text_color = '#001A72'
+    chart_grid_color = 'rgba(128,128,128,0.2)'
 
     # --- Gráficos Premium ---
     col_chart1, col_chart2 = st.columns(2)

@@ -94,38 +94,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# JavaScript para remover textos indesejados
-st.markdown("""
-    <script>
-    // Remove textos do file uploader
-    function cleanFileUploader() {
-        const dropzone = document.querySelector('[data-testid="stFileUploadDropzone"]');
-        if (dropzone) {
-            // Remove todos os spans e smalls (textos de instrução)
-            const spans = dropzone.querySelectorAll('span');
-            const smalls = dropzone.querySelectorAll('small');
-            spans.forEach(el => {
-                if (!el.closest('button')) {
-                    el.style.display = 'none';
-                }
-            });
-            smalls.forEach(el => el.style.display = 'none');
-        }
-    }
-    
-    // Executa quando a página carrega
-    cleanFileUploader();
-    
-    // Executa novamente após um pequeno delay (para garantir que o Streamlit terminou de renderizar)
-    setTimeout(cleanFileUploader, 100);
-    setTimeout(cleanFileUploader, 500);
-    setTimeout(cleanFileUploader, 1000);
-    
-    // Observa mudanças no DOM e reaplica
-    const observer = new MutationObserver(cleanFileUploader);
-    observer.observe(document.body, { childList: true, subtree: true });
-    </script>
-""", unsafe_allow_html=True)
+# JavaScript removido para evitar travamento do navegador (loop infinito no MutationObserver)
+# O estilo CSS já deve ser suficiente para esconder os elementos
+
 
 # --- Funções de Lógica de Negócio ---
 
@@ -1223,6 +1194,12 @@ def delete_analysis_from_history(analysis_id):
 if 'uploader_key' not in st.session_state:
     st.session_state.uploader_key = 0
 
+
+if 'df_resultado' not in st.session_state:
+    st.session_state.df_resultado = None
+if 'current_metadata' not in st.session_state:
+    st.session_state.current_metadata = None
+
 col_logo, col_title, col_opts = st.columns([1, 4, 1])
 
 with col_opts:
@@ -1281,10 +1258,7 @@ with st.expander("📁 Upload e Configurações da Análise", expanded=expander_
 
 
 # --- Lógica de Processamento ---
-if 'df_resultado' not in st.session_state:
-    st.session_state.df_resultado = None
-if 'current_metadata' not in st.session_state:
-    st.session_state.current_metadata = None
+
 
 if processar and uploaded_files:
     with st.spinner("Processando arquivos..."):

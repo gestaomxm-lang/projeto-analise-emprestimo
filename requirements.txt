@@ -3,3 +3,4 @@ openpyxl
 xlsxwriter
 streamlit
 plotly
+altair

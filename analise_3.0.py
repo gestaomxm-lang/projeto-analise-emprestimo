@@ -389,7 +389,30 @@ if st.session_state.df_resultado is None:
 col_logo, col_title, col_opts = st.columns([1, 4, 1])
 
 with col_opts:
-    st.empty() # Espaço vazio onde estava o botão
+    if st.button("🔄 Atualizar", help="Busca novos emails e atualiza os dados agora", use_container_width=True):
+        status_placeholder = st.container()
+        
+        with status_placeholder:
+            with st.status("🤖 Executando atualização manual...", expanded=True) as status:
+                st.write("Iniciando processo...")
+                log_component = st.empty()
+                
+                try:
+                    # Captura logs e roda o fluxo
+                    with StdoutCapturer(log_component):
+                        sucesso = auto_analise.executar_fluxo_diario(baixar_email=True)
+                    
+                    if sucesso:
+                        status.update(label="✅ Atualização Concluída!", state="complete", expanded=False)
+                        st.success("Dados atualizados! Recarregando...")
+                        time.sleep(2)
+                        st.rerun()
+                    else:
+                        status.update(label="❌ Falha na Atualização", state="error", expanded=True)
+                        st.error("Ocorreu um erro. Verifique o log acima.")
+                except Exception as e:
+                    status.update(label="❌ Erro Crítico", state="error")
+                    st.error(f"Erro: {e}")
 
 
 with col_logo:

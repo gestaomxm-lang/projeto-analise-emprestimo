@@ -447,17 +447,8 @@ if st.session_state.df_resultado is None:
 
 # --- Dashboard ---
 if st.session_state.df_resultado is not None:
-    df = st.session_state.df_resultado.copy() # Copia para não afetar estado original se rerodado
+    df = st.session_state.df_resultado
     
-    # HOTFIX: Aplica normalização de nomes "De-Para" na visualização (caso pickle seja antigo)
-    try:
-        if 'Unidade Origem' in df.columns:
-            df['Unidade Origem'] = df['Unidade Origem'].apply(analise_core.normalizar_hospital)
-        if 'Unidade Destino' in df.columns:
-            df['Unidade Destino'] = df['Unidade Destino'].apply(analise_core.normalizar_hospital)
-    except Exception as e:
-        print(f"Aviso: Não foi possível normalizar hospitais na view: {e}")
-
     # Mostra informações da análise atual
     # Mostra informações da análise atual
     # Mostra informações do período apurado

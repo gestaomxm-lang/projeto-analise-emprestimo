@@ -107,10 +107,21 @@ st.markdown("""
 # (Funções movidas para biblioteca externa para permitir automação)
 
 
-def gerar_excel_bytes(df):
-    # Remove coluna auxiliar de data objeto se existir (causa erro de timezone no Excel)
+def gerar_excel_bytes(df_in):
+    # Cria cópia para não alterar o original da sessão
+    df = df_in.copy()
+    
+    # Remove coluna auxiliar de data objeto se existir
     if 'Data_Obj' in df.columns:
         df = df.drop(columns=['Data_Obj'])
+        
+    # Remove timezones de colunas datetime (Excel não suporta)
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            try:
+                df[col] = df[col].dt.tz_localize(None)
+            except:
+                pass
         
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:

@@ -269,6 +269,7 @@ if st.session_state.df_resultado is None:
 
 col_logo, col_title, col_opts = st.columns([1, 4, 1])
 
+with col_opts:
     st.empty() # Espaço vazio onde estava o botão
 
 

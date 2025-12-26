@@ -264,7 +264,7 @@ if st.session_state.df_resultado is None:
                 'modo': 'Automático 🤖'
             }
     except Exception as e:
-        print(f"Erro ao carregar dados automáticos: {e}")
+        st.error(f"Erro ao carregar dados automáticos: {e}")
 
 
 col_logo, col_title, col_opts = st.columns([1, 4, 1])

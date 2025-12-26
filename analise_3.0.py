@@ -40,8 +40,8 @@ def job_atualizacao():
 @st.cache_resource
 def start_background_scheduler():
     """Inicia o agendador apenas uma vez (Singleton)."""
-    # Agenda para rodar a cada 1 hora
-    schedule.every(1).hours.do(job_atualizacao)
+    # Agenda para rodar todo dia às 07:00
+    schedule.every().day.at("07:00").do(job_atualizacao)
     # Também roda uma vez logo no início para garantir (opcional, já temos o run-on-load)
     
     # Inicia Thread

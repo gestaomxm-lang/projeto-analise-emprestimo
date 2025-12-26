@@ -716,53 +716,59 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_callba
         
     return df_resultado, stats
 
-def normalizar_hospital(nome):
+def _normalizar_hospital(nome):
+    """
+    Padroniza nomes de hospitais com base em regras de negócio (De/Para).
+    """
     if pd.isna(nome): return nome
-    nome = str(nome).strip().upper()
     
-    # Mapeamento exato (De -> Para) conforme solicitado
-    de_para_exato = {
-        "CASA DE PORTUGAL": "HOSPITAL CASA DE PORTUGAL",
-        "CASA DE PORTUGAL - REDE CASA": "HOSPITAL CASA DE PORTUGAL",
+    # 1. Strip para evitar erros com espaços invisíveis
+    nome_original = str(nome).strip().upper()
+    
+    # 2. Dicionário de Mapeamento (De -> Para)
+    de_para = {
+        # HOSPITAL CASA DE PORTUGAL
+        'CASA DE PORTUGAL': 'HOSPITAL CASA DE PORTUGAL',
+        'CASA DE PORTUGAL - REDE CASA': 'HOSPITAL CASA DE PORTUGAL',
         
-        "HOSPITAL CASA MENSSANA - REDE CASA": "HOSPITAL CASA MENSSANA",
-        "HC MENSSANA PARTICULAR - REDE CASA": "HOSPITAL CASA MENSSANA",
+        # HOSPITAL CASA MENSSANA
+        'HOSPITAL CASA MENSSANA - REDE CASA': 'HOSPITAL CASA MENSSANA',
+        'HC MENSSANA PARTICULAR - REDE CASA': 'HOSPITAL CASA MENSSANA',
         
-        "HOSPITAL EVANGELICO - REDE CASA": "HOSPITAL CASA EVANGELICO",
-        "HOSPITAL CASA EVANGÉLICO - REDE CASA": "HOSPITAL CASA EVANGELICO",
-        "HOSP.EVANGELICO - REDE CASA": "HOSPITAL CASA EVANGELICO",
-        "HOSPITAL CASA EVANGELICO - REDE CASA": "HOSPITAL CASA EVANGELICO",
+        # HOSPITAL CASA EVANGELICO
+        'HOSPITAL EVANGELICO - REDE CASA': 'HOSPITAL CASA EVANGELICO',
+        'HOSPITAL CASA EVANGÉLICO - REDE CASA': 'HOSPITAL CASA EVANGELICO',
+        'HOSP.EVANGELICO - REDE CASA': 'HOSPITAL CASA EVANGELICO',
+        'HOSPITAL CASA EVANGELICO - REDE CASA': 'HOSPITAL CASA EVANGELICO',
         
-        "HOSPITAL CASA RIO LARANJEIRAS - REDE CASA": "HOSPITAL CASA RIO LARANJEIRAS",
-        "HOSPITAL RIO LARANJEIRAS - REDE CASA": "HOSPITAL CASA RIO LARANJEIRAS",
-        "HOSPITAL RIO LARANJEIRAS LTDA - REDE CASA": "HOSPITAL CASA RIO LARANJEIRAS",
+        # HOSPITAL CASA RIO LARANJEIRAS
+        'HOSPITAL CASA RIO LARANJEIRAS - REDE CASA': 'HOSPITAL CASA RIO LARANJEIRAS',
+        'HOSPITAL RIO LARANJEIRAS - REDE CASA': 'HOSPITAL CASA RIO LARANJEIRAS',
+        'HOSPITAL RIO LARANJEIRAS LTDA - REDE CASA': 'HOSPITAL CASA RIO LARANJEIRAS',
         
-        "HOSPITAL CASA RIO BOTAFOGO - REDE CASA": "HOSPITAL CASA RIO BOTAFOGO",
+        # HOSPITAL CASA RIO BOTAFOGO
+        'HOSPITAL CASA RIO BOTAFOGO - REDE CASA': 'HOSPITAL CASA RIO BOTAFOGO',
         
-        "HOSPITAL CASA SANTA CRUZ - REDE CASA": "HOSPITAL CASA SANTA CRUZ",
-        "HOSPITAL CASA SANTA CRUZ  - REDE CASA": "HOSPITAL CASA SANTA CRUZ",
+        # HOSPITAL CASA SANTA CRUZ
+        'HOSPITAL CASA SANTA CRUZ - REDE CASA': 'HOSPITAL CASA SANTA CRUZ',
         
-        "HOSPITAL CASA SAO BERNARDO - REDE CASA": "HOSPITAL CASA SAO BERNARDO",
+        # HOSPITAL CASA SAO BERNARDO
+        'HOSPITAL CASA SAO BERNARDO - REDE CASA': 'HOSPITAL CASA SAO BERNARDO',
         
-        "HOSPITAL DE CANCER": "HOSPITAL CASA PREMIUM",
-        "HOSPITAL DE CANCER - REDE CASA": "HOSPITAL CASA PREMIUM",
-        "HOSPITAL CASA HOSPITAL DO CANCER – HCHC ADMINISTRACAO E GEST - REDE CASA": "HOSPITAL CASA PREMIUM",
-        "HOSPITAL CASA HOSPITAL DO CANCER - REDE CASA": "HOSPITAL CASA PREMIUM",
+        # HOSPITAL CASA PREMIUM
+        'HOSPITAL DE CANCER': 'HOSPITAL CASA PREMIUM', 
+        'HOSPITAL DE CANCER - REDE CASA': 'HOSPITAL CASA PREMIUM',
+        'HOSPITAL CASA HOSPITAL DO CANCER – HCHC ADMINISTRACAO E GEST - REDE CASA': 'HOSPITAL CASA PREMIUM',
+        'HOSPITAL CASA HOSPITAL DO CANCER - REDE CASA': 'HOSPITAL CASA PREMIUM',
         
-        "HOSPITAL ILHA DO GOVERNADOR": "HOSPITAL CASA ILHA DO GOVERNADOR",
-        "HOSPITAL ILHA DO GOVERNADOR - REDE CASA": "HOSPITAL CASA ILHA DO GOVERNADOR",
-        "HOSPITAL ILHA DO GOVERNADOR LTDA - REDE CASA": "HOSPITAL CASA ILHA DO GOVERNADOR"
+        # HOSPITAL CASA ILHA DO GOVERNADOR
+        'HOSPITAL ILHA DO GOVERNADOR': 'HOSPITAL CASA ILHA DO GOVERNADOR',
+        'HOSPITAL ILHA DO GOVERNADOR - REDE CASA': 'HOSPITAL CASA ILHA DO GOVERNADOR',
+        'HOSPITAL ILHA DO GOVERNADOR LTDA - REDE CASA': 'HOSPITAL CASA ILHA DO GOVERNADOR',
     }
-
-    if nome in de_para_exato:
-        return de_para_exato[nome]
-        
-    rubbish_suffixes = [" - REDE CASA", " - RIO DE JANEIRO", " - RJ"]
-    for suffix in rubbish_suffixes:
-        if nome.endswith(suffix):
-            return nome.replace(suffix, "")
     
-    return nome
+    # 3. Aplica o mapeamento. Se não existir, mantém o original.
+    return de_para.get(nome_original, nome_original)
 
 def _combinar_data_hora(df):
     if 'hora' in df.columns and 'data' in df.columns:
@@ -815,9 +821,9 @@ def preparar_dataframe(df):
     df['data'] = _parse_date_column(df['data'])
     
     if 'unidade_origem' in df.columns:
-        df['unidade_origem'] = df['unidade_origem'].apply(normalizar_hospital)
+        df['unidade_origem'] = df['unidade_origem'].apply(_normalizar_hospital)
     if 'unidade_destino' in df.columns:
-        df['unidade_destino'] = df['unidade_destino'].apply(normalizar_hospital)
+        df['unidade_destino'] = df['unidade_destino'].apply(_normalizar_hospital)
         
     # Normalização numérica
     for col in ['qt_entrada', 'valor_total']:

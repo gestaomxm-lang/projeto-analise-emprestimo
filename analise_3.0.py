@@ -17,7 +17,15 @@ import time
 import threading
 import auto_analise
 
+# Configuração da página (DEVE ser o primeiro comando Streamlit)
+st.set_page_config(
+    page_title="Análise de Empréstimos Hospitalares",
+    page_icon="page_icon.png",
+    layout="wide"
+)
+
 # --- Agendador em Background (Cron Job Simulado) ---
+
 def run_pending_jobs():
     """Função rodada pela thread em background."""
     print("🕒 Iniciando loop do agendador em background...")
@@ -53,12 +61,6 @@ def start_background_scheduler():
 start_background_scheduler()
 
 
-# Configuração da página
-st.set_page_config(
-    page_title="Análise de Empréstimos Hospitalares",
-    page_icon="page_icon.png",
-    layout="wide"
-)
 
 # --- Estilização Personalizada ---
 st.markdown("""

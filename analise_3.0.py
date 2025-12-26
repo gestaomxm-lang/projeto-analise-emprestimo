@@ -389,11 +389,11 @@ if st.session_state.df_resultado is None:
 col_logo, col_title, col_opts = st.columns([1, 4, 1])
 
 with col_opts:
-    if st.button("🔄 Atualizar", help="Busca novos emails e atualiza os dados agora", use_container_width=True):
+    if st.button("Atualizar", help="Busca novos emails e atualiza os dados agora", use_container_width=True):
         status_placeholder = st.container()
         
         with status_placeholder:
-            with st.status("🤖 Executando atualização manual...", expanded=True) as status:
+            with st.status("Executando atualização manual...", expanded=True) as status:
                 st.write("Iniciando processo...")
                 log_component = st.empty()
                 

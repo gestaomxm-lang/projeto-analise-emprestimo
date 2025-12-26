@@ -249,6 +249,30 @@ if 'current_metadata' not in st.session_state:
     st.session_state.current_metadata = None
 
 # --- Carregamento Automático da Análise Diária ---
+import sys
+from io import StringIO
+
+class StdoutCapturer:
+    def __init__(self, container):
+        self.container = container
+        self.buffer = StringIO()
+        self.original_stdout = sys.stdout
+        
+    def __enter__(self):
+        sys.stdout = self
+        return self
+        
+    def __exit__(self, exc_type, exc_value, traceback):
+        sys.stdout = self.original_stdout
+        
+    def write(self, s):
+        self.original_stdout.write(s) # Maintain console log
+        self.buffer.write(s)
+        self.container.code(self.buffer.getvalue(), language="text")
+        
+    def flush(self):
+        self.original_stdout.flush()
+
 if st.session_state.df_resultado is None:
     try:
         daily_pkl = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dados", "resultado_diario.pkl")
@@ -278,11 +302,15 @@ if st.session_state.df_resultado is None:
 
     except Exception as e:
         # Se der erro ou não existir, tenta RODAR O FLUXO AGORA (Self-Healing / Cloud Mode)
-        st.warning(f"Dados locais não encontrados ou erro: {e}. Tentando executar automação em tempo real...")
+        st.warning(f"Dados locais não encontrados. Iniciando automação em nuvem...")
+        
+        log_container = st.empty()
+        
         try:
             import auto_analise
-            with st.spinner("Baixando e processando dados do dia... Isso pode levar alguns segundos."):
-                sucesso = auto_analise.executar_fluxo_diario(baixar_email=True)
+            with StdoutCapturer(log_container):
+                with st.spinner("Executando robô de análise..."):
+                    sucesso = auto_analise.executar_fluxo_diario(baixar_email=True)
             
             if sucesso:
                 # Tenta carregar novamente

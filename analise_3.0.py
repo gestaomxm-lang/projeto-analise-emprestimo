@@ -60,6 +60,41 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- Autenticação (Login) ---
+def check_password():
+    """Retorna True se o usuário/senha estiverem corretos."""
+    
+    # Se já estiver logado, retorna True
+    if st.session_state.get('authenticated', False):
+        return True
+        
+    # Container de Login
+    login_container = st.empty()
+    
+    with login_container.container():
+        st.markdown("<h1 style='text-align: center; color: #001A72;'>🔐 Login - Análise Empréstimos</h1>", unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([1,2,1])
+        
+        with col2:
+            with st.form("login_form"):
+                user = st.text_input("Usuário", placeholder="Digite seu usuário")
+                password = st.text_input("Senha", type="password", placeholder="Digite sua senha")
+                submit = st.form_submit_button("Entrar", use_container_width=True)
+                
+                if submit:
+                    if user == "RedeCasa" and password == "Rede@Casa2026":
+                        st.session_state['authenticated'] = True
+                        st.success("Login realizado com sucesso!")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("Usuário ou senha incorretos.")
+                        
+    return False
+
+if not check_password():
+    st.stop() # Interrompe a execução do resto do app se não logar
+
 # --- Estilização Personalizada ---
 st.markdown("""
     <style>

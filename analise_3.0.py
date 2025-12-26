@@ -303,11 +303,10 @@ if 'current_metadata' not in st.session_state:
 import sys
 from io import StringIO
 
-class StdoutCapturer:
-    def __init__(self, container):
-        self.container = container
-        self.buffer = StringIO()
+class ToastNotifier:
+    def __init__(self):
         self.original_stdout = sys.stdout
+        self.buffer = ""
         
     def __enter__(self):
         sys.stdout = self
@@ -317,9 +316,26 @@ class StdoutCapturer:
         sys.stdout = self.original_stdout
         
     def write(self, s):
-        self.original_stdout.write(s) # Maintain console log
-        self.buffer.write(s)
-        self.container.code(self.buffer.getvalue(), language="text")
+        self.original_stdout.write(s)
+        self.buffer += s
+        if "\n" in s:
+            lines = self.buffer.split("\n")
+            for line in lines[:-1]:
+                self.process_line(line)
+            self.buffer = lines[-1]
+            
+    def process_line(self, line):
+        clean = line.strip()
+        if not clean: return
+        
+        # Detecta etapas e notifica
+        if ">> Etapa" in clean:
+            msg = clean.replace(">> ", "")
+            st.toast(msg, icon="🔄")
+        elif "✅" in clean:
+            st.toast(clean, icon="✅")
+        elif "❌" in clean:
+            st.toast(clean, icon="❌")
         
     def flush(self):
         self.original_stdout.flush()
@@ -355,11 +371,11 @@ if st.session_state.df_resultado is None:
         # Se der erro ou não existir, tenta RODAR O FLUXO AGORA (Self-Healing / Cloud Mode)
         st.warning(f"Dados locais não encontrados. Iniciando automação em nuvem...")
         
-        log_container = st.empty()
+        # log_container = st.empty() # Não precisa mais disso
         
         try:
             import auto_analise
-            with StdoutCapturer(log_container):
+            with ToastNotifier():
                 with st.spinner("Executando robô de análise..."):
                     sucesso = auto_analise.executar_fluxo_diario(baixar_email=True)
             
@@ -390,29 +406,21 @@ col_logo, col_title, col_opts = st.columns([1, 4, 1])
 
 with col_opts:
     if st.button("Atualizar", help="Busca novos emails e atualiza os dados agora", use_container_width=True):
-        status_placeholder = st.container()
-        
-        with status_placeholder:
-            with st.status("Executando atualização manual...", expanded=True) as status:
-                st.write("Iniciando processo...")
-                log_component = st.empty()
+        try:
+            # Intercepta prints e transforma em Toasts
+            with ToastNotifier():
+                with st.spinner("Processando atualização..."):
+                    sucesso = auto_analise.executar_fluxo_diario(baixar_email=True)
+            
+            if sucesso:
+                st.toast("Atualização Concluída com Sucesso!", icon="🎉")
+                time.sleep(2)
+                st.rerun()
+            else:
+                st.error("Falha na atualização. Verifique o console ou tente novamente.")
                 
-                try:
-                    # Captura logs e roda o fluxo
-                    with StdoutCapturer(log_component):
-                        sucesso = auto_analise.executar_fluxo_diario(baixar_email=True)
-                    
-                    if sucesso:
-                        status.update(label="✅ Atualização Concluída!", state="complete", expanded=False)
-                        st.success("Dados atualizados! Recarregando...")
-                        time.sleep(2)
-                        st.rerun()
-                    else:
-                        status.update(label="❌ Falha na Atualização", state="error", expanded=True)
-                        st.error("Ocorreu um erro. Verifique o log acima.")
-                except Exception as e:
-                    status.update(label="❌ Erro Crítico", state="error")
-                    st.error(f"Erro: {e}")
+        except Exception as e:
+            st.error(f"Erro Crítico: {e}")
 
 
 with col_logo:

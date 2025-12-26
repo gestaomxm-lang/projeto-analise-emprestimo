@@ -331,11 +331,11 @@ class ToastNotifier:
         # Detecta etapas e notifica
         if ">> Etapa" in clean:
             msg = clean.replace(">> ", "")
-            st.toast(msg, icon="🔄")
+            st.toast(msg)
         elif "✅" in clean:
-            st.toast(clean, icon="✅")
+            st.toast(clean)
         elif "❌" in clean:
-            st.toast(clean, icon="❌")
+            st.toast(clean)
         
     def flush(self):
         self.original_stdout.flush()
@@ -413,7 +413,7 @@ with col_opts:
                     sucesso = auto_analise.executar_fluxo_diario(baixar_email=True)
             
             if sucesso:
-                st.toast("Atualização Concluída com Sucesso!", icon="🎉")
+                st.toast("Atualização Concluída com Sucesso!")
                 time.sleep(2)
                 st.rerun()
             else:

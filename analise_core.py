@@ -716,7 +716,7 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_callba
         
     return df_resultado, stats
 
-def _normalizar_hospital(nome):
+def normalizar_hospital(nome):
     if pd.isna(nome): return nome
     nome = str(nome).strip().upper()
     
@@ -815,9 +815,9 @@ def preparar_dataframe(df):
     df['data'] = _parse_date_column(df['data'])
     
     if 'unidade_origem' in df.columns:
-        df['unidade_origem'] = df['unidade_origem'].apply(_normalizar_hospital)
+        df['unidade_origem'] = df['unidade_origem'].apply(normalizar_hospital)
     if 'unidade_destino' in df.columns:
-        df['unidade_destino'] = df['unidade_destino'].apply(_normalizar_hospital)
+        df['unidade_destino'] = df['unidade_destino'].apply(normalizar_hospital)
         
     # Normalização numérica
     for col in ['qt_entrada', 'valor_total']:

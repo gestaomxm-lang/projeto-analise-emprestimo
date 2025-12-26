@@ -623,10 +623,10 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
     
     total_items = len(df_saida)
     
-    for idx_s, row_s in df_saida.iterrows():
-        if progress_bar and idx_s % 20 == 0:  # Atualiza a cada 20 itens
-            progress = 0.05 + (idx_s / total_items) * 0.9
-            progress_bar.progress(progress, text=f"Analisando {idx_s + 1}/{total_items}")
+    for i, (idx_s, row_s) in enumerate(df_saida.iterrows()):
+        if progress_bar and i % 20 == 0:  # Atualiza a cada 20 itens
+            progress = 0.05 + (i / total_items) * 0.9
+            progress_bar.progress(progress, text=f"Analisando {i + 1}/{total_items}")
 
         doc_num = row_s['doc_num']
         produto_s = row_s['ds_produto']
@@ -655,6 +655,10 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
             stats['conformes'] += 1
             stats['matches_perfeitos'] += 1
             
+            # Cálculo de Tempo de Recebimento
+            data_e = row_e['data']
+            tempo_recebimento = (data_e - data_s).days if pd.notna(data_s) and pd.notna(data_e) else None
+            
             obs = f"Score:100% | {match_info['detalhes']}"
             comp_info = f"{match_info['detalhes_produto']}"
             
@@ -662,6 +666,7 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
                 data_s, row_s['unidade_origem'], row_s['unidade_destino'], doc_num, produto_s, row_e['ds_produto'],
                 row_s.get('especie', ''), valor_s, valor_e, diferenca_valor, 
                 qtd_s, qtd_e, diferenca_qtd,
+                data_e, tempo_recebimento, # Novas colunas
                 status, tipo_div, "⭐⭐⭐ Excelente", obs, comp_info
             ])
             continue # Pula processamento normal
@@ -996,7 +1001,7 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
                 tipo_div = "-"
                 stats['conformes'] += 1
             else:
-                status = "⚠️ Não Conforme"
+                status = "❌ Não Conforme"
                 stats['nao_conformes'] += 1
                 
                 tipos_div = []
@@ -1018,10 +1023,15 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
             obs = f"Score:{best_match['score']:.0f}% | {best_match['detalhes']}"
             comp_info = f"{best_match['detalhes_produto']}"
             
+            # Cálculo de Tempo de Recebimento
+            data_e = row_e['data']
+            tempo_recebimento = (data_e - data_s).days if pd.notna(data_s) and pd.notna(data_e) else None
+            
             analise.append([
                 data_s, row_s['unidade_origem'], row_s['unidade_destino'], doc_num, produto_s, row_e['ds_produto'],
                 row_s.get('especie', ''), valor_s, valor_e, diferenca_valor, 
                 qtd_s, qtd_e, diferenca_qtd,
+                data_e, tempo_recebimento, # Novas colunas
                 status, tipo_div, qualidade_match, obs, comp_info
             ])
         else:
@@ -1040,7 +1050,8 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
                 data_s, row_s['unidade_origem'], row_s['unidade_destino'], doc_num, produto_s, "-",
                 row_s.get('especie', ''), valor_s, None, None, 
                 qtd_s, None, None,
-                "❌ Não Conforme", motivo, "-", "Sem correspondência encontrada", "-"
+                None, None, # Novas colunas (sem data entrada e tempo)
+                "⚠️ Não Recebido", motivo, "-", "Sem correspondência encontrada", "-"
             ])
     
     if progress_bar:
@@ -1066,6 +1077,7 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
             doc_num_e, "-", produto_e, row_e.get('especie', ''),
             None, float(row_e['valor_total']), None, 
             None, qtd_e, None,
+            row_e['data'], None, # Data entrada existe, mas tempo não aplicável (entrada sem saída)
             "❌ Não Conforme", "Item recebido sem saída correspondente", "-",
             "Entrada órfã", "-"
         ])
@@ -1075,6 +1087,7 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_bar=No
         "Produto (Saída)", "Produto (Entrada)", "Espécie", 
         "Valor Saída (R$)", "Valor Entrada (R$)", "Diferença (R$)",
         "Qtd Saída", "Qtd Entrada", "Diferença Qtd",
+        "Data Entrada", "Tempo Recebimento (Dias)",
         "Status", "Tipo de Divergência", 
         "Qualidade Match", "Observações", "Detalhes Produto"
     ])
@@ -1377,6 +1390,12 @@ if processar and uploaded_files:
             df_saida['valor_total'] = df_saida['valor_total'].apply(normalizar_valor_numerico)
         if 'valor_total' in df_entrada.columns:
             df_entrada['valor_total'] = df_entrada['valor_total'].apply(normalizar_valor_numerico)
+            
+        # Ordena por data para garantir linha do tempo correta em multi-períodos
+        if 'data' in df_saida.columns:
+            df_saida = df_saida.sort_values(by='data', ascending=True)
+        if 'data' in df_entrada.columns:
+            df_entrada = df_entrada.sort_values(by='data', ascending=True)
         
         # Processa
         progress_bar = st.progress(0, text="Iniciando...")
@@ -1452,9 +1471,14 @@ if st.session_state.df_resultado is not None:
     
     total_saida_periodo = df_filtered['Valor Saída (R$)'].sum()
     total_entrada_periodo = df_filtered['Valor Entrada (R$)'].sum()
-    diff_financeira_periodo = total_saida_periodo - total_entrada_periodo
     
-    col_balanco1, col_balanco2, col_balanco3 = st.columns(3)
+    # Valores Pendentes: soma do valor de saída dos itens Não Recebidos
+    valor_pendente = df_filtered[df_filtered['Status'].str.contains('Não Recebido')]['Valor Saída (R$)'].sum()
+    
+    # Valor Divergente Recebimento: soma absoluta da diferença dos itens Não Conformes (já recebidos mas com divergência)
+    valor_divergente_nc = df_filtered[df_filtered['Status'].str.contains('Não Conforme')]['Diferença (R$)'].abs().sum()
+    
+    col_balanco1, col_balanco2, col_balanco3, col_balanco4 = st.columns(4)
     
     with col_balanco1:
         st.metric("Total Saída (Enviado)", f"R$ {total_saida_periodo:_.2f}".replace('.', ',').replace('_', '.'), help="Soma do valor de todos os itens de saída no período")
@@ -1463,18 +1487,26 @@ if st.session_state.df_resultado is not None:
         st.metric("Total Entrada (Recebido)", f"R$ {total_entrada_periodo:_.2f}".replace('.', ',').replace('_', '.'), help="Soma do valor de todos os itens de entrada no período")
         
     with col_balanco3:
-        cor_diff = "normal"
-        if diff_financeira_periodo > 0:
-            cor_diff = "inverse" # Vermelho/Negativo (saiu mais que entrou)
-        elif diff_financeira_periodo < 0:
-            cor_diff = "off" # Verde/Positivo (entrou mais que saiu - raro mas possível)
-            
+        # Percentual em relação ao total de saída
+        perc_pendente = (valor_pendente / total_saida_periodo * 100) if total_saida_periodo > 0 else 0
         st.metric(
-            "Divergência Financeira", 
-            f"R$ {diff_financeira_periodo:_.2f}".replace('.', ',').replace('_', '.'), 
-            delta=f"{(diff_financeira_periodo/total_saida_periodo*100):.1f}%" if total_saida_periodo > 0 else "0%",
+            "Valores Pendentes de Recebimento", 
+            f"R$ {valor_pendente:_.2f}".replace('.', ',').replace('_', '.'), 
+            delta=f"{perc_pendente:.1f}%",
             delta_color="inverse",
-            help="Balanço Líquido: Total Saída - Total Entrada. Indica se 'sobrou' ou 'faltou' valor no total geral."
+            help="Valor total dos itens que ainda não foram recebidos (Status: Não Recebido)"
+        )
+
+    with col_balanco4:
+        # Percentual em relação ao total de entrada (ou saída? entrada faz mais sentido para itens recebidos)
+        # Vamos usar entrada pois são itens que entraram com erro.
+        perc_div_nc = (valor_divergente_nc / total_entrada_periodo * 100) if total_entrada_periodo > 0 else 0
+        st.metric(
+            "Valor Divergente no Recebimento", 
+            f"R$ {valor_divergente_nc:_.2f}".replace('.', ',').replace('_', '.'), 
+            delta=f"{perc_div_nc:.1f}%",
+            delta_color="inverse",
+            help="Soma absoluta das diferenças dos itens recebidos com divergência (Status: Não Conforme)"
         )
     
     st.divider()
@@ -1511,16 +1543,14 @@ if st.session_state.df_resultado is not None:
         </style>
     """, unsafe_allow_html=True)
     
-    # Ajusta largura das colunas para dar mais espaço ao Valor Divergente
-    kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns([1, 1, 1, 1.3, 1])
+    # Ajusta largura das colunas para ficarem iguais e ocuparem a página
+    kpi1, kpi2, kpi3, kpi4, kpi5, kpi6 = st.columns(6)
     
     total_analisado = len(df_filtered)
     
     total_conforme = len(df_filtered[df_filtered['Status'].str.contains('Conforme') & ~df_filtered['Status'].str.contains('Não')])
     total_nao_conforme = len(df_filtered[df_filtered['Status'].str.contains('Não Conforme')])
-    
-    # Cálculos de divergência
-    valor_divergente = df_filtered[df_filtered['Status'].str.contains('Não Conforme')]['Diferença (R$)'].abs().sum()
+    total_pendente = len(df_filtered[df_filtered['Status'].str.contains('Não Recebido')])
     
     # Conta itens com divergência de quantidade (excluindo não encontrados/nulos)
     # Considera divergência se 'Diferença Qtd' não é nulo e é diferente de 0
@@ -1529,31 +1559,36 @@ if st.session_state.df_resultado is not None:
         (df_filtered['Diferença Qtd'] != 0)
     ])
     
+    # Cálculo Média Tempo Recebimento
+    # Considera apenas itens recebidos (Conformes e Não Conformes com entrada), ignorando pendentes
+    if 'Tempo Recebimento (Dias)' in df_filtered.columns:
+        # Filtra explicitamente para remover 'Não Recebido' e garantir que só itens com data contem
+        df_tempo_calc = df_filtered[
+            ~df_filtered['Status'].str.contains('Não Recebido') & 
+            df_filtered['Tempo Recebimento (Dias)'].notna()
+        ]
+        media_tempo = df_tempo_calc['Tempo Recebimento (Dias)'].mean()
+        media_tempo_str = f"{media_tempo:.0f} dias" if pd.notna(media_tempo) else "-"
+    else:
+        media_tempo_str = "-"
+    
     # Calcula percentuais
     perc_conforme = (total_conforme / total_analisado * 100) if total_analisado > 0 else 0
     perc_nao_conforme = (total_nao_conforme / total_analisado * 100) if total_analisado > 0 else 0
-    
-    # Formata valor com ponto para milhar e vírgula para decimal
-    def formatar_valor(valor):
-        # Formata com 2 casas decimais
-        valor_str = f"{valor:_.2f}".replace("_", ".")
-        # Separa parte inteira e decimal
-        partes = valor_str.split(".")
-        if len(partes) == 3:  # tem milhar
-            return f"{partes[0]}.{partes[1]},{partes[2]}"
-        else:  # sem milhar
-            return f"{partes[0]},{partes[1]}"
+    perc_pendente = (total_pendente / total_analisado * 100) if total_analisado > 0 else 0
     
     with kpi1:
         st.metric("Total de Itens", f"{total_analisado:_.0f}".replace("_", "."), help="Total de registros analisados")
     with kpi2:
         st.metric("Conformes", f"{total_conforme:_.0f}".replace("_", "."), delta=f"{perc_conforme:.1f}%", help="Itens em conformidade")
     with kpi3:
-        st.metric("Não Conformes", f"{total_nao_conforme:_.0f}".replace("_", "."), delta=f"-{perc_nao_conforme:.1f}%", delta_color="inverse", help="Itens com divergências")
+        st.metric("Não Conformes", f"{total_nao_conforme:_.0f}".replace("_", "."), delta=f"-{perc_nao_conforme:.1f}%", delta_color="inverse", help="Itens com divergências de valor ou quantidade")
     with kpi4:
-        st.metric("Valor Divergente", f"R$ {formatar_valor(valor_divergente)}", help="Soma ABSOLUTA das diferenças dos itens Não Conformes. Ex: Falta 10 + Sobra 10 = 20 de divergência.")
+        st.metric("Pendentes", f"{total_pendente:_.0f}".replace("_", "."), delta=f"{perc_pendente:.1f}%", delta_color="inverse", help="Itens sem entrada registrada (Não Recebido)")
     with kpi5:
-        st.metric("Divergência Qtd", f"{qtd_divergente_count:_.0f}".replace("_", "."), help="Itens com diferença na quantidade (Saída vs Entrada)")
+        st.metric("Divergência Qtd", f"{qtd_divergente_count:_.0f}".replace("_", "."), help="Itens com diferença na quantidade")
+    with kpi6:
+        st.metric("Tempo Médio", media_tempo_str, help="Média de dias entre Saída e Entrada")
     
     st.divider()
     
@@ -1605,145 +1640,62 @@ if st.session_state.df_resultado is not None:
     col_chart1, col_chart2 = st.columns(2)
     
     with col_chart1:
-        st.markdown("#### Distribuição de Status")
+        st.markdown("#### Status de recebimento")
         
         # Conta status
         status_counts = df_filtered['Status'].value_counts()
         
+        # Remove emojis das labels e define cores
+        clean_labels = [label.replace('✅ ', '').replace('❌ ', '').replace('⚠️ ', '') for label in status_counts.index]
+        
+        # Mapeamento de cores fixo
+        color_map = {
+            'Conforme': '#00C853',      # Verde
+            'Não Conforme': '#FF4444',  # Vermelho
+            'Não Recebido': '#FF9800'   # Laranja
+        }
+        
+        # Gera lista de cores na ordem dos dados
+        chart_colors = [color_map.get(label, '#999999') for label in clean_labels]
+        
         # Gráfico de rosca com Plotly - texto otimizado
         fig_status = go.Figure(data=[go.Pie(
-            labels=status_counts.index,
+            labels=clean_labels,
             values=status_counts.values,
             hole=0.6,
             marker=dict(
-                colors=['#00C853', '#FF6B6B', '#FFA726'],
+                colors=chart_colors,
                 line=dict(color='white', width=3)
             ),
             textposition='outside',
-            textinfo='label+percent',
-            textfont=dict(size=13, family="Arial", color=chart_text_color),
+            textinfo='percent', # Apenas percentual no gráfico
+            textfont=dict(size=12, family="Arial", color=chart_text_color),
             insidetextorientation='radial',
-            pull=[0.05, 0.05, 0.05],  # Separa levemente as fatias
+            pull=[0.05] * len(status_counts),  # Separa levemente todas as fatias
             hovertemplate='<b>%{label}</b><br>Quantidade: %{value}<br>Percentual: %{percent}<extra></extra>'
         )])
         
         fig_status.update_layout(
-            showlegend=False,  # Remove legenda duplicada
+            showlegend=True,  # Exibe legenda com ícones (bolinhas/quadrados)
+            legend=dict(
+                orientation="v",
+                yanchor="bottom",
+                y=0,
+                xanchor="right",
+                x=1,
+                font=dict(size=11, color=chart_text_color),
+                bgcolor="rgba(0,0,0,0)" # Fundo transparente
+            ),
             height=380,
-            margin=dict(t=10, b=10, l=10, r=10),
+            margin=dict(t=20, b=20, l=40, r=40), # Margens maiores para não cortar texto
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(family="Arial", size=13, color=chart_text_color)
+            font=dict(family="Arial", size=12, color=chart_text_color)
         )
         
         st.plotly_chart(fig_status, use_container_width=True)
         
     with col_chart2:
-        st.markdown("#### Top 5 Divergências")
-        
-        df_div = df_filtered[df_filtered['Status'].str.contains('Não Conforme')]
-        if not df_div.empty:
-            div_counts = df_div['Tipo de Divergência'].value_counts().head(5)
-            
-            fig_div = go.Figure(data=[go.Bar(
-                x=div_counts.values,
-                y=div_counts.index,
-                orientation='h',
-                marker=dict(
-                    color=div_counts.values,
-                    colorscale='Reds',
-                    line=dict(color='white', width=1)
-                ),
-                text=div_counts.values,
-                textposition='outside',
-                textfont=dict(color=chart_text_color),
-                hovertemplate='<b>%{y}</b><br>Quantidade: %{x}<extra></extra>'
-            )])
-            
-            # Calcula limite do eixo X com folga para o texto
-            max_val = div_counts.values.max()
-            
-            fig_div.update_layout(
-                height=350,
-                margin=dict(t=20, b=20, l=20, r=50),  # Margem direita aumentada
-                xaxis_title="Quantidade",
-                yaxis_title="",
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                font=dict(family="Arial", size=12, color=chart_text_color),
-                xaxis=dict(
-                    showgrid=True, 
-                    gridcolor=chart_grid_color, 
-                    title_font=dict(color=chart_text_color), 
-                    tickfont=dict(color=chart_text_color),
-                    range=[0, max_val * 1.2]  # 20% de folga
-                ),
-                yaxis=dict(showgrid=False, tickfont=dict(color=chart_text_color))
-            )
-            
-            st.plotly_chart(fig_div, use_container_width=True)
-        else:
-            st.info("Nenhuma divergência encontrada!")
-    
-    # --- Linha 2: Análise Temporal e Hospitais ---
-    col_chart3, col_chart4 = st.columns(2)
-    
-    with col_chart3:
-        st.markdown("#### Evolução Temporal")
-        
-        # Agrupa por data
-        df_temp = df_filtered.copy()
-        df_temp['Data_Agrupada'] = pd.to_datetime(df_temp['Data']).dt.date
-        temporal = df_temp.groupby(['Data_Agrupada', 'Status']).size().reset_index(name='Quantidade')
-        
-        fig_temporal = px.line(
-            temporal,
-            x='Data_Agrupada',
-            y='Quantidade',
-            color='Status',
-            markers=True,
-            color_discrete_map={
-                '✅ Conforme': '#00C853',
-                '⚠️ Não Conforme': '#FF6B6B',
-                '❌ Não Conforme': '#FFA726'
-            }
-        )
-        
-        fig_temporal.update_layout(
-            height=350,
-            margin=dict(t=20, b=60, l=20, r=20),
-            xaxis_title="Data",
-            yaxis_title="Quantidade",
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(family="Arial", size=12, color=chart_text_color),
-            hovermode='x unified',
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=-0.4,
-                xanchor="center",
-                x=0.5,
-                font=dict(color=chart_text_color)
-            ),
-            xaxis=dict(
-                tickangle=-45,  # Rotaciona labels
-                tickmode='auto',
-                nticks=10,  # Limita número de ticks
-                tickfont=dict(size=10, color=chart_text_color),
-                title_font=dict(color=chart_text_color),
-                gridcolor=chart_grid_color
-            ),
-            yaxis=dict(
-                tickfont=dict(color=chart_text_color),
-                title_font=dict(color=chart_text_color),
-                gridcolor=chart_grid_color
-            )
-        )
-        
-        st.plotly_chart(fig_temporal, use_container_width=True)
-    
-    with col_chart4:
         st.markdown("#### Top 5 Hospitais (Divergências)")
         
         df_div = df_filtered[df_filtered['Status'].str.contains('Não Conforme')]

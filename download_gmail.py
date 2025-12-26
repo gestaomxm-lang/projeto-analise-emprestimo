@@ -41,7 +41,8 @@ def download_daily_attachments():
         mail.select("inbox")
 
         # Data de hoje para filtro (IMAP exige formato específico: 26-Dec-2025)
-        date_str = datetime.now().strftime("%d-%b-%Y")
+        # MODIFICADO: Busca últimos 5 dias para garantir que encontre algo para teste
+        date_str = (datetime.now() - dt.timedelta(days=5)).strftime("%d-%b-%Y")
         
         # Constrói a query de busca
         query = f'(SINCE "{date_str}")'

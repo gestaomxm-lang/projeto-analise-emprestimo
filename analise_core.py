@@ -720,7 +720,7 @@ def _normalizar_hospital(nome):
     if pd.isna(nome): return nome
     
     # Remove espaços invisíveis/estranhos e normaliza múltiplos espaços
-    nome_limpo = " ".join(str(nome).split())
+    nome_limpo = " ".join(str(nome).split()).upper()
     
     # Dicionário De/Para conforme especificação do Engenheiro de Dados
     de_para = {

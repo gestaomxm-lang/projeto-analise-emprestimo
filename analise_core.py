@@ -718,24 +718,54 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_callba
 
 def _normalizar_hospital(nome):
     if pd.isna(nome): return nome
-    nome = str(nome).strip().upper()
     
+    # Remove espaços invisíveis/estranhos
+    nome_limpo = str(nome).strip()
+    
+    # Dicionário De/Para conforme especificação do Engenheiro de Dados
     de_para = {
-        "HOSPITAL DE CANCER - REDE CASA": "HOSPITAL DE CANCER",
-        "CASA DE PORTUGAL - REDE CASA": "CASA DE PORTUGAL",
-        "HOSPITAL CASA RIO LARANJEIRAS - REDE CASA": "HOSPITAL CASA RIO LARANJEIRAS",
-        "HOSPITAL CASA HOSPITAL ECOR - REDE CASA": "HOSPITAL ECOR",
+        # HOSPITAL CASA DE PORTUGAL
+        'CASA DE PORTUGAL': 'HOSPITAL CASA DE PORTUGAL',
+        'CASA DE PORTUGAL - REDE CASA': 'HOSPITAL CASA DE PORTUGAL',
+        
+        # HOSPITAL CASA MENSSANA
+        'HOSPITAL CASA MENSSANA - REDE CASA': 'HOSPITAL CASA MENSSANA',
+        'HC MENSSANA PARTICULAR - REDE CASA': 'HOSPITAL CASA MENSSANA',
+        
+        # HOSPITAL CASA EVANGELICO
+        'HOSPITAL EVANGELICO - REDE CASA': 'HOSPITAL CASA EVANGELICO',
+        'HOSPITAL CASA EVANGÉLICO - REDE CASA': 'HOSPITAL CASA EVANGELICO',
+        'HOSP.EVANGELICO - REDE CASA': 'HOSPITAL CASA EVANGELICO',
+        'HOSPITAL CASA EVANGELICO - REDE CASA': 'HOSPITAL CASA EVANGELICO',
+        
+        # HOSPITAL CASA RIO LARANJEIRAS
+        'HOSPITAL CASA RIO LARANJEIRAS - REDE CASA': 'HOSPITAL CASA RIO LARANJEIRAS',
+        'HOSPITAL RIO LARANJEIRAS - REDE CASA': 'HOSPITAL CASA RIO LARANJEIRAS',
+        'HOSPITAL RIO LARANJEIRAS LTDA - REDE CASA': 'HOSPITAL CASA RIO LARANJEIRAS',
+        
+        # HOSPITAL CASA RIO BOTAFOGO
+        'HOSPITAL CASA RIO BOTAFOGO - REDE CASA': 'HOSPITAL CASA RIO BOTAFOGO',
+        
+        # HOSPITAL CASA SANTA CRUZ
+        'HOSPITAL CASA SANTA CRUZ - REDE CASA': 'HOSPITAL CASA SANTA CRUZ',
+        
+        # HOSPITAL CASA SAO BERNARDO
+        'HOSPITAL CASA SAO BERNARDO - REDE CASA': 'HOSPITAL CASA SAO BERNARDO',
+        
+        # HOSPITAL CASA PREMIUM
+        'HOSPITAL DE CANCER': 'HOSPITAL CASA PREMIUM',
+        'HOSPITAL DE CANCER - REDE CASA': 'HOSPITAL CASA PREMIUM',
+        'HOSPITAL CASA HOSPITAL DO CANCER – HCHC ADMINISTRACAO E GEST - REDE CASA': 'HOSPITAL CASA PREMIUM',
+        'HOSPITAL CASA HOSPITAL DO CANCER - REDE CASA': 'HOSPITAL CASA PREMIUM',
+        
+        # HOSPITAL CASA ILHA DO GOVERNADOR
+        'HOSPITAL ILHA DO GOVERNADOR': 'HOSPITAL CASA ILHA DO GOVERNADOR',
+        'HOSPITAL ILHA DO GOVERNADOR - REDE CASA': 'HOSPITAL CASA ILHA DO GOVERNADOR',
+        'HOSPITAL ILHA DO GOVERNADOR LTDA - REDE CASA': 'HOSPITAL CASA ILHA DO GOVERNADOR'
     }
     
-    if nome in de_para:
-        return de_para[nome]
-        
-    rubbish_suffixes = [" - REDE CASA", " - RIO DE JANEIRO", " - RJ"]
-    for suffix in rubbish_suffixes:
-        if nome.endswith(suffix):
-            return nome.replace(suffix, "")
-    
-    return nome
+    # Retorna o valor mapeado ou o original se não encontrar
+    return de_para.get(nome_limpo, nome_limpo)
 
 def _combinar_data_hora(df):
     if 'hora' in df.columns and 'data' in df.columns:

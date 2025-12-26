@@ -50,7 +50,7 @@ def start_background_scheduler():
     return t
 
 # Inicia o agendador
-start_background_scheduler()
+
 
 
 # Configuração da página
@@ -59,6 +59,10 @@ st.set_page_config(
     page_icon="page_icon.png",
     layout="wide"
 )
+
+# Inicia o agendador DEPOIS da config da página (Obrigatório pelo Streamlit)
+start_background_scheduler()
+
 
 # --- Estilização Personalizada ---
 st.markdown("""

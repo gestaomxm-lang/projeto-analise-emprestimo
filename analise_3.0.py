@@ -253,18 +253,58 @@ if st.session_state.df_resultado is None:
     try:
         daily_pkl = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dados", "resultado_diario.pkl")
         if os.path.exists(daily_pkl):
-            with open(daily_pkl, "rb") as f:
-                dados_auto = pickle.load(f)
-            
-            st.session_state.df_resultado = dados_auto['df']
-            st.session_state.current_metadata = {
-                'arquivo_saida': dados_auto['metadata']['arquivo_saida'],
-                'arquivo_entrada': dados_auto['metadata']['arquivo_entrada'],
-                'data_formatada': dados_auto['metadata']['data_processamento'].strftime("%d/%m/%Y %H:%M:%S"),
-                'modo': 'Automático 🤖'
-            }
+            try:
+                with open(daily_pkl, "rb") as f:
+                    dados_auto = pickle.load(f)
+                
+                # Verifica data do arquivo
+                data_proc = dados_auto['metadata']['data_processamento']
+                is_today = data_proc.date() == datetime.now().date()
+                
+                if not is_today:
+                     raise Exception("Dados desatualizados (não são de hoje)")
+                     
+                st.session_state.df_resultado = dados_auto['df']
+                st.session_state.current_metadata = {
+                    'arquivo_saida': dados_auto['metadata']['arquivo_saida'],
+                    'arquivo_entrada': dados_auto['metadata']['arquivo_entrada'],
+                    'data_formatada': data_proc.strftime("%d/%m/%Y %H:%M:%S"),
+                    'modo': 'Automático 🤖'
+                }
+            except Exception:
+                raise # Força cair no except abaixo que roda a automação
+        else:
+            raise FileNotFoundError("Arquivo de dados não existe") # Força cair no except
+
     except Exception as e:
-        st.error(f"Erro ao carregar dados automáticos: {e}")
+        # Se der erro ou não existir, tenta RODAR O FLUXO AGORA (Self-Healing / Cloud Mode)
+        st.warning(f"Dados locais não encontrados ou erro: {e}. Tentando executar automação em tempo real...")
+        try:
+            import auto_analise
+            with st.spinner("Baixando e processando dados do dia... Isso pode levar alguns segundos."):
+                sucesso = auto_analise.executar_fluxo_diario(baixar_email=True)
+            
+            if sucesso:
+                # Tenta carregar novamente
+                if os.path.exists(daily_pkl):
+                    with open(daily_pkl, "rb") as f:
+                        dados_auto = pickle.load(f)
+                    
+                    st.session_state.df_resultado = dados_auto['df']
+                    st.session_state.current_metadata = {
+                        'arquivo_saida': dados_auto['metadata']['arquivo_saida'],
+                        'arquivo_entrada': dados_auto['metadata']['arquivo_entrada'],
+                        'data_formatada': dados_auto['metadata']['data_processamento'].strftime("%d/%m/%Y %H:%M:%S"),
+                        'modo': 'Automático (Sob Demanda) 🤖'
+                    }
+                    st.rerun() # Recarrega a página com os dados novos
+                else:
+                    st.error("Automação rodou mas arquivo não foi criado.")
+            else:
+                st.error("Falha na execução da automação. Verifique logs.")
+        except Exception as e2:
+             st.error(f"Erro crítico ao tentar rodar automação: {e2}")
+
 
 
 col_logo, col_title, col_opts = st.columns([1, 4, 1])

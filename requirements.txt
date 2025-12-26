@@ -4,3 +4,4 @@ xlsxwriter
 streamlit
 plotly
 altair
+schedule

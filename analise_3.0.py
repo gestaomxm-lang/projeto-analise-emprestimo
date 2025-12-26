@@ -12,6 +12,46 @@ import plotly.graph_objects as go
 import pickle
 import os
 import analise_core  # Biblioteca de lógica central
+import schedule
+import time
+import threading
+import auto_analise
+
+# --- Agendador em Background (Cron Job Simulado) ---
+def run_pending_jobs():
+    """Função rodada pela thread em background."""
+    print("🕒 Iniciando loop do agendador em background...")
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
+
+def job_atualizacao():
+    """Tarefa que roda a cada hora."""
+    print(f"⏰ [Auto-Update] Iniciando atualização agendada: {datetime.now()}")
+    try:
+        # Usa um container vazio pois não estamos no contexto da UI principal aqui
+        # Apenas roda o fluxo backend
+        sys.stdout = sys.__stdout__ # Garante log no console do servidor
+        auto_analise.executar_fluxo_diario(baixar_email=True)
+        print("✅ [Auto-Update] Concluído com sucesso.")
+    except Exception as e:
+        print(f"❌ [Auto-Update] Erro: {e}")
+
+@st.cache_resource
+def start_background_scheduler():
+    """Inicia o agendador apenas uma vez (Singleton)."""
+    # Agenda para rodar a cada 1 hora
+    schedule.every(1).hours.do(job_atualizacao)
+    # Também roda uma vez logo no início para garantir (opcional, já temos o run-on-load)
+    
+    # Inicia Thread
+    t = threading.Thread(target=run_pending_jobs, daemon=True)
+    t.start()
+    return t
+
+# Inicia o agendador
+start_background_scheduler()
+
 
 # Configuração da página
 st.set_page_config(

@@ -64,55 +64,59 @@ def download_daily_attachments():
             print("❌ Nenhum email encontrado hoje com os critérios definidos.")
             return False
             
-        print(f"📧 Encontrados {len(email_ids)} emails. Processando o mais recente...")
+        print(f"📧 Encontrados {len(email_ids)} emails. Procurando anexos no mais recente...")
         
-        # Pega o mais recente
-        latest_email_id = email_ids[-1]
-        status, msg_data = mail.fetch(latest_email_id, "(RFC822)")
-        
-        for response_part in msg_data:
-            if isinstance(response_part, tuple):
-                msg = email.message_from_bytes(response_part[1])
-                subject, encoding = decode_header(msg["Subject"])[0]
-                if isinstance(subject, bytes):
-                    subject = subject.decode(encoding if encoding else "utf-8")
-                
-                print(f"📩 Processando email: {subject}")
-                
-                attachments_found = 0
-                
-                # Garante diretório
-                os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
-                
-                # Limpa diretório antes de baixar novos (opcional, para garantir frescor)
-                for f in os.listdir(DOWNLOAD_FOLDER):
-                    os.remove(os.path.join(DOWNLOAD_FOLDER, f))
-                
-                for part in msg.walk():
-                    if part.get_content_maintype() == "multipart":
-                        continue
-                    if part.get("Content-Disposition") is None:
-                        continue
-                        
-                    filename = part.get_filename()
-                    if filename:
-                        # Decodifica nome se necessário
-                        if decode_header(filename)[0][1]:
-                            filename = decode_header(filename)[0][0].decode(decode_header(filename)[0][1])
+        # Itera do mais recente para o mais antigo (reversed)
+        for email_id in reversed(email_ids):
+            status, msg_data = mail.fetch(email_id, "(RFC822)")
+            
+            for response_part in msg_data:
+                if isinstance(response_part, tuple):
+                    msg = email.message_from_bytes(response_part[1])
+                    subject, encoding = decode_header(msg["Subject"])[0]
+                    if isinstance(subject, bytes):
+                        subject = subject.decode(encoding if encoding else "utf-8")
+                    
+                    print(f"📩 Verificando email: {subject}")
+                    
+                    # Verifica preliminar de anexos antes de limpar a pasta
+                    temp_attachments = []
+                    for part in msg.walk():
+                        if part.get_content_maintype() == "multipart": continue
+                        if part.get("Content-Disposition") is None: continue
+                        filename = part.get_filename()
+                        if filename and (filename.endswith(".xlsx") or filename.endswith(".xls")):
+                            temp_attachments.append(part)
                             
-                        if filename.endswith(".xlsx") or filename.endswith(".xls"):
+                    if len(temp_attachments) >= 1: # Aceita se tiver pelo menos 1, mas idealmente 2
+                        print(f"✅ Encontrados {len(temp_attachments)} anexos Excel neste e-mail. Baixando...")
+                        
+                        # Limpa pasta apenas agora que garantimos que vamos baixar novos
+                        os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+                        for f in os.listdir(DOWNLOAD_FOLDER):
+                            try:
+                                os.remove(os.path.join(DOWNLOAD_FOLDER, f))
+                            except: pass
+                            
+                        attachments_downloaded = 0
+                        for part in temp_attachments:
+                            filename = part.get_filename()
+                            if decode_header(filename)[0][1]:
+                                filename = decode_header(filename)[0][0].decode(decode_header(filename)[0][1])
+                            
                             filepath = os.path.join(DOWNLOAD_FOLDER, filename)
                             with open(filepath, "wb") as f:
                                 f.write(part.get_payload(decode=True))
                             print(f"⬇️ Baixado: {filename}")
-                            attachments_found += 1
-                
-                if attachments_found >= 2:
-                    print(f"✅ Sucesso! {attachments_found} arquivos baixados em {DOWNLOAD_FOLDER}")
-                    return True
-                else:
-                    print(f"⚠️ Atenção: Apenas {attachments_found} arquivos Excel encontrados (esperado 2).")
-                    return attachments_found > 0
+                            attachments_downloaded += 1
+                        
+                        print(f"🎉 Sucesso! {attachments_downloaded} arquivos atualizados.")
+                        return True
+                    else:
+                        print("⚠️ Este email não contém arquivos Excel válidos. Tentando o próximo mais recente...")
+        
+        print("❌ Nenhum email com anexos Excel válidos encontrado nos últimos 5 dias.")
+        return False
 
     except Exception as e:
         print(f"Erro durante processamento: {e}")

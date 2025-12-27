@@ -530,9 +530,10 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_callba
                 doc_match = False
                 
                 if destino_eh_cp:
-                    score_total += 40
-                    detalhes_match.append("Doc:CP")
-                    doc_match = True
+                    # Se for Casa de Portugal, ignora documento mas exige match de produto forte ou data próxima
+                    score_total += 45 # Dá um bonus menor que o match exato de documento (que é +40 mas garante filtro)
+                    detalhes_match.append("Doc:Ignorado(CP)")
+                    doc_match = True # Trata como se tivesse dado match de doc para liberar análise de produto
                 elif doc_num and doc_num != '' and doc_num_e and doc_num_e != '':
                     if doc_num == doc_num_e:
                         score_total += 40
@@ -552,7 +553,12 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_callba
                 if doc_match:
                     qtd_e = float(row_e.get('qt_entrada', 0))
                     qtd_match_exato = abs(qtd_e - qtd_s) < 0.01
-                    limiar_efetivo = 40 if qtd_match_exato else 85
+                    
+                    if destino_eh_cp:
+                        # Para CP, se quantidade bater, aceita produto 60%. Se não, exige 80%.
+                        limiar_efetivo = 60 if qtd_match_exato else 80
+                    else:
+                        limiar_efetivo = 40 if qtd_match_exato else 85
                 else:
                     limiar_efetivo = limiar_similaridade
                 

@@ -17,6 +17,7 @@ import time
 import threading
 import auto_analise
 import auth_manager
+import base64
 
 # --- Agendador em Background (Cron Job Simulado) ---
 def run_pending_jobs():
@@ -71,14 +72,22 @@ if 'user_unit' not in st.session_state:
 if 'username' not in st.session_state:
     st.session_state.username = None
 
+def img_to_base64(img_path):
+    try:
+        with open(img_path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    except:
+        return ""
+
 def login_page():
-    st.markdown("<h1 style='text-align: center; color: #001A72;'>🔐 Login</h1>", unsafe_allow_html=True)
+    # Carrega logo em base64
+    logo_b64 = img_to_base64("logo.png")
+    img_tag = f'<img src="data:image/png;base64,{logo_b64}" style="height: 50px; vertical-align: middle; margin-right: 15px;">' if logo_b64 else ""
+    
+    st.markdown(f"<h1 style='text-align: center; color: #001A72; display: flex; align-items: center; justify-content: center;'>{img_tag}Login</h1>", unsafe_allow_html=True)
+    
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
-        try:
-            st.image("logo.png", use_container_width=True)
-        except:
-            pass
         with st.form("login_form"):
             username = st.text_input("Usuário")
             password = st.text_input("Senha", type="password")

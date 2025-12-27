@@ -16,6 +16,7 @@ import schedule
 import time
 import threading
 import auto_analise
+import auth_manager
 
 # --- Agendador em Background (Cron Job Simulado) ---
 def run_pending_jobs():
@@ -59,6 +60,106 @@ st.set_page_config(
     page_icon="page_icon.png",
     layout="wide"
 )
+
+# --- Autenticação e Gestão de Sessão ---
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+if 'user_role' not in st.session_state:
+    st.session_state.user_role = None
+if 'user_unit' not in st.session_state:
+    st.session_state.user_unit = None
+if 'username' not in st.session_state:
+    st.session_state.username = None
+
+def login_page():
+    st.markdown("<h1 style='text-align: center; color: #001A72;'>🔐 Login</h1>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns([1, 2, 1])
+    with c2:
+        with st.form("login_form"):
+            username = st.text_input("Usuário")
+            password = st.text_input("Senha", type="password")
+            submit = st.form_submit_button("Entrar", use_container_width=True)
+            
+            if submit:
+                users = auth_manager.load_users()
+                if username in users and auth_manager.verify_password(users[username]['password'], password):
+                    st.session_state.logged_in = True
+                    st.session_state.username = username
+                    st.session_state.user_role = users[username]['role']
+                    st.session_state.user_unit = users[username].get('unit')
+                    st.session_state.user_name_display = users[username]['name']
+                    st.success("Login realizado com sucesso!")
+                    time.sleep(0.5)
+                    st.rerun()
+                else:
+                    st.error("Usuário ou senha incorretos.")
+
+if not st.session_state.logged_in:
+    login_page()
+    st.stop()
+
+# --- Sidebar: Info do Usuário e Logout ---
+with st.sidebar:
+    st.title("👤 Usuário")
+    if st.session_state.get('user_name_display'):
+        st.write(f"**Nome:** {st.session_state.user_name_display}")
+    if st.session_state.user_role:
+        st.write(f"**Perfil:** {st.session_state.user_role.capitalize()}")
+    if st.session_state.user_unit:
+        st.write(f"**Unidade:** {st.session_state.user_unit}")
+    
+    if st.button("Sair", use_container_width=True):
+        st.session_state.logged_in = False
+        st.session_state.username = None
+        st.session_state.user_role = None
+        st.rerun()
+        
+    if st.session_state.user_role == 'admin':
+        st.divider()
+        st.subheader("⚙️ Administração")
+        if st.checkbox("Gerenciar Usuários"):
+            st.session_state.show_admin = True
+        else:
+            st.session_state.show_admin = False
+
+# --- Área Administrativa (Apenas Admin) ---
+if st.session_state.get('show_admin'):
+    st.title("⚙️ Gerenciamento de Usuários")
+    
+    # Criar novo usuário
+    with st.expander("➕ Criar Novo Usuário"):
+        with st.form("new_user"):
+            new_user = st.text_input("Username")
+            new_pass = st.text_input("Senha", type="password")
+            new_name = st.text_input("Nome Completo")
+            new_role = st.selectbox("Perfil", ["admin", "gestao", "unidade"])
+            new_unit = st.text_input("Unidade (Apenas se Perfil=unidade)")
+            if st.form_submit_button("Criar"):
+                if auth_manager.create_user(new_user, new_pass, new_name, new_role, new_unit):
+                    st.success(f"Usuário {new_user} criado!")
+                else:
+                    st.error("Erro ao criar usuário.")
+    
+    # Listar Usuários
+    st.subheader("Usuários Cadastrados")
+    all_users = auth_manager.load_users()
+    
+    # Converte dicionário para DataFrame para exibir
+    users_data = []
+    for u, data in all_users.items():
+        users_data.append({
+            "Username": u,
+            "Nome": data['name'],
+            "Perfil": data['role'],
+            "Unidade": data.get('unit', '-')
+        })
+    st.dataframe(pd.DataFrame(users_data), use_container_width=True)
+    
+    if st.button("Voltar ao Dashboard"):
+        st.session_state.show_admin = False
+        st.rerun()
+    
+    st.stop() # Para execução aqui se estiver no admin panel
 
 # --- Estilização Personalizada ---
 st.markdown("""
@@ -448,7 +549,11 @@ if st.session_state.df_resultado is None:
 # --- Dashboard ---
 if st.session_state.df_resultado is not None:
     df = st.session_state.df_resultado
-    
+    # Aplica Row-Level Security (RLS) para Unidades
+    if st.session_state.user_role == 'unidade' and st.session_state.user_unit:
+        df = df[df['Unidade Destino'] == st.session_state.user_unit]
+        st.warning(f"🔒 Visualizando apenas dados de: **{st.session_state.user_unit}**")
+
     # Mostra informações da análise atual
     # Mostra informações da análise atual
     # Mostra informações do período apurado

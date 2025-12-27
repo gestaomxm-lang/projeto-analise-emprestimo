@@ -1,66 +1,66 @@
 {
     "admin": {
-        "password": "4e7fe717e418d300f95b0b62f64ce702992ad843d4947227dd5e5ae33d545fe2f6b48391258374db13f8273601ad1da71b0ccdd309c940041889039be224aa3d",
+        "password": "04c4a1b9ddcdbf0da48d9268c7c3a0acc6b787ca177f5df85c9527b8806b102ecf54f7b68e04ce3d8f0522569e43d4a1fd97ea94d134747238771d53320a5cff",
         "name": "Administrador",
         "role": "admin",
         "unit": null
     },
     "gestao": {
-        "password": "75e32a815e0b4b6914625e7c41ea5f54520157f1566561d7d22e35ccbd5f1541971bf3f4df4df07d939cdda7648247b7260e4fcb9779122e001059bc0293e1da",
+        "password": "7add7e071fb0b196076ad90d61a7e1657a2e14ab7a98ba3fa0adc4efd9e41e085735c7373dedc481e124e03d46a133b74046f30d85f5674c41845a627ee353a1",
         "name": "Equipe de Gestão",
         "role": "gestao",
         "unit": null
     },
     "h_portugal": {
-        "password": "60573b79259d4840f8b093acd3b34a01b08d92a16bc55d5a034940937eb1144ed00bc7a5b555aa48c5862be466a335719a54f87a52c66dea3269d9715813e683",
+        "password": "553709500de621c847328745c10606eb0d5eee71857032c24e88e295674ba40e3a4f8aee8f94d8cc952245aef08afa339d7fade972e91a62ff0759d6ecb182e4",
         "name": "HOSPITAL CASA DE PORTUGAL",
         "role": "unidade",
         "unit": "HOSPITAL CASA DE PORTUGAL"
     },
     "h_menssana": {
-        "password": "872aa02b10f33453404d71a234bbb152dbea9f4c44738d293b0260a1afa736fcc047715df85a622fd6db3d8998dc4f1ee046bd9396a250a501c3a5da1f81b60b",
+        "password": "d58f5336327971123f9e52b9b8d8868565790484c1b278fcc199fb6433c28c649ca7570172f11e91825aa1b3ec6c71446df8c7a0b049b3a45f919b4f5edc1f08",
         "name": "HOSPITAL CASA MENSSANA",
         "role": "unidade",
         "unit": "HOSPITAL CASA MENSSANA"
     },
     "h_evangelico": {
-        "password": "a02d505f51db51cd693cf4c0e4a2c41687f2885610e3b6d4601c663f94cb6728cd36358e9b238ae0f9dfd8aaec88a8bad941788ce47a4c82d58a66da6cbc730b",
+        "password": "28f22c4dd0cc647687b45736facee9adb6979914ebe2cd06440eff330e53a06e23471f9cb64b0390df8d90728958a9f3436267a2054e17af893fceb2e101c7b0",
         "name": "HOSPITAL CASA EVANGELICO",
         "role": "unidade",
         "unit": "HOSPITAL CASA EVANGELICO"
     },
     "h_laranjeiras": {
-        "password": "3d73a898ae5fb0852cdb845fdf2144e3359aa7d2711fc9c785c2305f161343c158f44f4faa167a26d03c80fba7c753b981fb2de02abfa708cc0145d3d7bfd55b",
+        "password": "abd7600bdbf5c42fb06c79e4d3143096bc2fe4bba92f3c7092c1d2178bdc43357c1238a8f1758aad7d639b22d6cf138c898124f83cfdd78ee2db75b6d3e7d9d7",
         "name": "HOSPITAL CASA RIO LARANJEIRAS",
         "role": "unidade",
         "unit": "HOSPITAL CASA RIO LARANJEIRAS"
     },
     "h_botafogo": {
-        "password": "83052e0aa4d5e097c47fe680046087a79f5be4a65d2688ab6ff8c4e0d389193a78f4c975f8d54a12e7138d99989a8ed0e14354c27164fe285d9e16620e6dab9f",
+        "password": "04a968d24cf5a130d4b4ea8ea7cee3b03da92bee3757ef3ec57f072939b3e2a03df57934b6086a5c46697eefb5f05e94ee8fb5f7d1110e73d50acb99a1f1ebc9",
         "name": "HOSPITAL CASA RIO BOTAFOGO",
         "role": "unidade",
         "unit": "HOSPITAL CASA RIO BOTAFOGO"
     },
     "h_santacruz": {
-        "password": "807bcb4787deced1338aadc27c49e7055352c7c632d50a5a6fd63d1752cd6f458a26944e64c8184dec952affdad45f1de6c4ab74a3b0b4dc64c995547cecdb53",
+        "password": "e3e4ce472962fd3889cf53552b14fa9a6bef8f70af4060803b8a6a8c9f4e610b35671a1c725f6e75d54b662d9d84734a00b481537a012a6589c92f45802ddac2",
         "name": "HOSPITAL CASA SANTA CRUZ",
         "role": "unidade",
         "unit": "HOSPITAL CASA SANTA CRUZ"
     },
     "h_bernardo": {
-        "password": "01ea1c8b1481153f73e5f44d3228fc663b4e749a93520cb20811210c31d70962eb3cc009ed1d208debb4404978b96fe610c0b72a8e00d9236e735d64c8465ccf",
+        "password": "aa628b8cde9d95e7fc40807241b3711e7aa16fbed9d96b433708ba1b070a30530884a7f43d08550994ba2a77185ff8c3e96dee3d8122a174988549f67498199c",
         "name": "HOSPITAL CASA SAO BERNARDO",
         "role": "unidade",
         "unit": "HOSPITAL CASA SAO BERNARDO"
     },
     "h_premium": {
-        "password": "7782cf4d29da1669281c529a336263c8ef7a595a31c71fb80f111c2c5c6057b9e9c064f241b2001d69a2d12f2861854acc0161d915796eb9c022252a2df87580",
+        "password": "b4172153ad539d139fddb7e065f4f0f383cb5d2f09d4634eb194977b4e259fac98738cf1d4c14c9d7f8ac0c9acd3593c6aa2d4ff1cc575ab3232fb981ecf1a3f",
         "name": "HOSPITAL CASA PREMIUM",
         "role": "unidade",
         "unit": "HOSPITAL CASA PREMIUM"
     },
     "h_ilha": {
-        "password": "fce37ae530fbe5df1958b8ab5c39fd01cc65cb8c42ab73f647c286cc360b38f5fefcd5506ed24abc7aea5444ef32f1631907a39452fff63bb765b292f0344d86",
+        "password": "2fbb9f8dd6f316961bbb6e582385ae1120de4845d3f0cedffc428b0a1835c09c79ab208019ff071f7a370f019325862922cc56aef98a5045def9f0a44c1ad6c1",
         "name": "HOSPITAL CASA ILHA DO GOVERNADOR",
         "role": "unidade",
         "unit": "HOSPITAL CASA ILHA DO GOVERNADOR"

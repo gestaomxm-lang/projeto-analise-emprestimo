@@ -3,7 +3,18 @@ import os
 import hashlib
 import binascii
 
+import remote_persistence
+
 USERS_FILE = "users.json"
+_initial_sync_done = False
+
+def ensure_sync():
+    global _initial_sync_done
+    if not _initial_sync_done:
+        print("☁️ [Auth] Buscando banco de dados na nuvem...")
+        if remote_persistence.sync_down():
+            print("☁️ [Auth] Banco atualizado da nuvem.")
+        _initial_sync_done = True
 
 def hash_password(password):
     """Hash password using PBKDF2 with SHA256 and a random salt."""
@@ -13,6 +24,7 @@ def hash_password(password):
     return (salt + pwdhash).decode('ascii')
 
 def verify_password(stored_password, provided_password):
+    ensure_sync() # Garante que temos a versão mais recente ao validar senha
     """Verify a stored password against one provided by user"""
     salt = stored_password[:64]
     stored_hash = stored_password[64:]
@@ -21,6 +33,7 @@ def verify_password(stored_password, provided_password):
     return pwdhash == stored_hash
 
 def load_users():
+    ensure_sync()
     if not os.path.exists(USERS_FILE):
         return {}
     try:
@@ -32,6 +45,8 @@ def load_users():
 def save_users(users):
     with open(USERS_FILE, 'w', encoding='utf-8') as f:
         json.dump(users, f, indent=4, ensure_ascii=False)
+    # Trigger cloud sync on save
+    remote_persistence.sync_up()
 
 def create_user(username, password, name, role, unit=None):
     users = load_users()

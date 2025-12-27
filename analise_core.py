@@ -719,8 +719,9 @@ def analisar_itens(df_saida, df_entrada, limiar_similaridade=65, progress_callba
 def _normalizar_hospital(nome):
     if pd.isna(nome): return nome
     
-    # Remove espaços invisíveis/estranhos e normaliza múltiplos espaços
-    nome_limpo = " ".join(str(nome).split()).upper()
+    # Remove espaços invisíveis/estranhos e normaliza múltiplos espaços e traços
+    nome_str = str(nome).replace('–', '-').replace('—', '-')
+    nome_limpo = " ".join(nome_str.split()).upper()
     
     # Dicionário De/Para conforme especificação do Engenheiro de Dados
     de_para = {

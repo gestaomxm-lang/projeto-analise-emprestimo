@@ -67,6 +67,16 @@ def update_password(username, new_password):
         return True
     return False
 
+def update_user_details(username, name=None, role=None, unit=None):
+    users = load_users()
+    if username in users:
+        if name: users[username]["name"] = name
+        if role: users[username]["role"] = role
+        if unit is not None: users[username]["unit"] = unit # Pode ser string vazia para limpar
+        save_users(users)
+        return True
+    return False
+
 def delete_user(username):
     users = load_users()
     if username in users:

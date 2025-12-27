@@ -75,6 +75,10 @@ def login_page():
     st.markdown("<h1 style='text-align: center; color: #001A72;'>🔐 Login</h1>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
+        try:
+            st.image("logo.png", use_container_width=True)
+        except:
+            pass
         with st.form("login_form"):
             username = st.text_input("Usuário")
             password = st.text_input("Senha", type="password")
@@ -139,6 +143,33 @@ if st.session_state.get('show_admin'):
                     st.success(f"Usuário {new_user} criado!")
                 else:
                     st.error("Erro ao criar usuário.")
+    
+    # Editar Usuário Existente
+    with st.expander("✏️ Editar Usuário"):
+        all_users_edit = auth_manager.load_users()
+        user_to_edit = st.selectbox("Selecione o Usuário", list(all_users_edit.keys()))
+        
+        if user_to_edit:
+            current_data = all_users_edit[user_to_edit]
+            with st.form("edit_user_form"):
+                ed_name = st.text_input("Nome Completo", value=current_data['name'])
+                ed_role = st.selectbox("Perfil", ["admin", "gestao", "unidade"], index=["admin", "gestao", "unidade"].index(current_data['role']))
+                ed_unit = st.text_input("Unidade (Apenas se Perfil=unidade)", value=current_data.get('unit', ''))
+                
+                st.markdown("---")
+                st.markdown("**Alterar Senha (deixe em branco para manter a atual)**")
+                ed_new_pass = st.text_input("Nova Senha", type="password")
+                
+                if st.form_submit_button("Salvar Alterações"):
+                    # Atualiza dados cadastrais
+                    auth_manager.update_user_details(user_to_edit, name=ed_name, role=ed_role, unit=ed_unit)
+                    
+                    # Atualiza senha se fornecida
+                    if ed_new_pass:
+                        auth_manager.update_password(user_to_edit, ed_new_pass)
+                        st.success(f"Dados e senha de {user_to_edit} atualizados!")
+                    else:
+                        st.success(f"Dados de {user_to_edit} atualizados!")
     
     # Listar Usuários
     st.subheader("Usuários Cadastrados")

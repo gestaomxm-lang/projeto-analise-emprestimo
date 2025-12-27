@@ -82,7 +82,7 @@ def img_to_base64(img_path):
 def login_page():
     # Carrega logo em base64
     logo_b64 = img_to_base64("logo.png")
-    img_tag = f'<img src="data:image/png;base64,{logo_b64}" style="height: 50px; vertical-align: middle; margin-right: 15px;">' if logo_b64 else ""
+    img_tag = f'<img src="data:image/png;base64,{logo_b64}" style="height: 30px; vertical-align: middle; margin-right: 15px;">' if logo_b64 else ""
     
     st.markdown(f"<h1 style='text-align: center; color: #001A72; display: flex; align-items: center; justify-content: center;'>{img_tag}Login</h1>", unsafe_allow_html=True)
     
